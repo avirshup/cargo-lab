@@ -1,0 +1,38 @@
+# rustfmt.toml
+
+# ───── unstable config ─────
+# On CLI, use `cargo +nightly fmt`
+# In RustRover, use `channel` dropdown in rustfmt settings
+unstable_features = true
+error_on_unformatted = false
+style_edition = "2024"
+
+# ───── Wrapping ───────────────────────────────────────────────── #
+max_width = 80
+# ───── unstable wrapping ─────
+format_strings = true
+wrap_comments = false  # would be nice if true but breaks too much formatting
+# comment_width = 80  # <- does not seem to work even if wrap_comments=true?
+
+
+# ───── Imports ────────────────────────────────────────────────── #
+# ───── unstable imports ─────
+imports_granularity = "Module"
+#imports_layout = "Vertical"
+group_imports = "StdExternalCrate"
+
+# ───── Blocks formatting ───────────────────────────────────────── #
+fn_params_layout = "Tall"
+use_field_init_shorthand = true
+match_block_trailing_comma = true
+# ───── unstable block formatting ─────
+force_multiline_blocks = false  # false = fewer curly braces = better
+match_arm_blocks = false
+match_arm_leading_pipes = "Preserve"
+
+# ───── Normalizations ─────────────────────────────────────────── #
+use_try_shorthand = true
+# ───── unstable normalizations ─────
+normalize_doc_attributes = true
+
+
