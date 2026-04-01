@@ -6,12 +6,6 @@ pub enum Error {
     #[error("Encountered multiple errors")] // TODO: display them
     MultipleErrors(Vec<Error>),
 
-    // HACK: This is not really an error, it should not be here,
-    // (although it SHOULD be an error if it were ever
-    // to bubble up)
-    #[error("Internal error, this should not happen")]
-    SkipMe,
-
     // ───── General runtime env problems ─────
     #[error("Required env var missing: {0}")]
     EnvVarMissing(String),
@@ -36,7 +30,7 @@ pub enum Error {
     #[error("{0}")]
     CargoFail(String),
 
-    #[error("{description} not found ('{path}' does not exist)")]
+    #[error("Path '{path}': {description})")]
     FileErr { path: String, description: String },
 
     // ───── TOML-related ─────
@@ -102,10 +96,6 @@ impl Error {
             first_err
         }
     }
-
-    // pub fn from_serde_err(err: impl serde::de::Error) -> Self {
-    //     Self::ManifestCorrupt(err.to_string())
-    // }
 }
 
 /// Lets us apply `?` to borrowed errors (which we get from cached results)

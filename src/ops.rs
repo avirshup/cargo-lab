@@ -4,9 +4,53 @@ use std::process;
 
 use color_print::{ceprintln, cprintln};
 
-use crate::global_ctx::GlobalCtx;
+use crate::global_ctx::{GlobalCtx, ProjectPaths};
 use crate::manifest_editor::ManifestEditor;
 use crate::{data, global_ctx, util};
+
+pub fn init_new_playground(
+    path: &Path,
+    name: &str,
+    edition: &str,
+    ctx: GlobalCtx,
+) -> crate::Result<()> {
+    // TODO: handle (probably w/ just a warning?)
+    //   if `--manifest-path` or `CARGO_PLAYGROUND_MANIFEST_PATH`
+    //   were provided (and ignore them otherwise)
+
+    if path.exists() {
+        return Err(crate::Error::FileErr {
+            path: path.to_string_lossy().into(),
+            description: "provided playground directory already exists.".into(),
+        });
+    }
+
+    // TODO: This could be made somewhat more atomic by assembling all of
+    //   this in a temporary directory (under the same parent, probably)
+    //   then moving it into place upon success
+
+    // 1. Create directories
+    util::create_dir(path)?;
+    let paths = ProjectPaths::from_manifest_dir(path)?;
+    util::create_dir(&paths.template_dir)?;
+    util::create_dir(&paths.script_dir)?;
+
+    // 2. Create Cargo.toml
+    util::write_file(
+        &paths.cargo_dot_toml,
+        &_init_manifest_content(name, edition),
+    )?;
+
+    // 3. Add the first script
+    new_script(
+        &data::ScriptConfigRequest::nodeps("my-first-script".to_owned()),
+        None,
+        false,
+        ctx.with_paths(paths),
+    )?;
+
+    Ok(())
+}
 
 /// Run the requested script via `cargo run` and activating the desired features
 ///
@@ -42,9 +86,13 @@ pub fn run_script(
 }
 
 /// Create a new script from a template, w/ optional dependencies
+///
+/// If the source file for the script already exists but does not have
+/// an entry in the manifest, this will add it to the manifest without modifying
+/// the source file.
 pub fn new_script(
     request: &data::ScriptConfigRequest,
-    template_name: &str,
+    template: Option<&str>,
     then_edit: bool,
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
@@ -52,14 +100,15 @@ pub fn new_script(
     if ctx.manifest_data()?.get_script(&request.script).is_some() {
         return Err(crate::Error::ScriptNameConflict(request.script.clone()));
     }
+    // TODO: handle source file name collisions too
 
     // ───── Part 1: run cargo add if necessary ─────────────────────── //
     // (if it was necessary, this returns a new context since
     // it will have modified Cargo.toml)
-    // TODO: would it be nice to keep the original context around?
     let new_ctx = _run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
 
-    // ───── Part 2: create the new script ──────────────────────────── //
+    // ───── Part 2: create new script (if it doesn't already exist) ── //
+    // TODO: less TOCTOU here, use `File::create_new`?
     let paths = new_ctx.project_paths()?;
     let src_filename = _script_name_to_filename(&request.script);
     let dest = paths.manifest_dir.join(&src_filename);
@@ -68,12 +117,22 @@ pub fn new_script(
             "<yellow>warning</>: Script '{}' already exists",
             paths.relpath_project_root(&dest)
         );
-    } else {
+    } else if let Some(template_name) = template {
+        // render the template from an existing file
+
+        // TODO: add a comment to the top the same as when using the builtin template
         let template_path = paths.template_path(template_name);
         util::copy_file(&template_path, &dest)?;
         ceprintln!(
-            "<green>success</>: Created script: {} -> {}",
+            "<green>success</>: Created script from template: {} -> {}",
             paths.relpath_project_root(&template_path),
+            paths.relpath_project_root(&dest)
+        );
+    } else {
+        // no specific template requested, just use the minimal script
+        util::write_file(&dest, &_init_minimial_script(&request.script))?;
+        ceprintln!(
+            "<green>success</>: Created minimal script at: {}",
             paths.relpath_project_root(&dest)
         );
     }
@@ -303,4 +362,33 @@ fn _print_script_info(
     } else {
         println!("{name}");
     }
+}
+
+/// Built-in template for a minimal script
+fn _init_minimial_script(name: &str) -> String {
+    format!(
+        r#"// playground script: {name}
+
+fn main() {{
+    println!("hello from world")
+}}
+"#
+    )
+}
+
+/// Create a template for the initial manifest.
+/// Just done as plain text so we can add comments
+pub fn _init_manifest_content(project_name: &str, edition: &str) -> String {
+    format!(
+        r#"\
+[package]
+name = "{project_name}"
+edition = "{edition}"
+publish = false
+
+[package.metadata.cargo-playground]
+enabled = true
+# editor-cmd = ["vim"]
+"#
+    )
 }
