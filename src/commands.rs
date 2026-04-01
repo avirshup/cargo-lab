@@ -1,5 +1,6 @@
 use crate::cli::CargoAddArgs;
 use crate::manifest_editor::CargoDotToml;
+use crate::util;
 use crate::{config, data};
 use color_print::cprintln;
 use std::os::unix::process::CommandExt;
@@ -44,13 +45,13 @@ use std::{fs, process};
 /// ONLY RETURNS UPON FAILURE - if everything works right,
 /// this `exec`s the cargo run
 /// command, so the invoked process replaces this one.
-pub fn run_script(bin_name: &str, args: &[String], paths: &config::Config) -> crate::Result<()> {
-    let cargo_doc = CargoDotToml::read(&paths.cargo_dot_toml)?;
+pub fn run_script(bin_name: &str, args: &[String], cfg: &config::Config) -> crate::Result<()> {
+    let cargo_doc = CargoDotToml::read(&cfg.cargo_dot_toml)?;
     let script = cargo_doc
         .get_script(bin_name)
         .ok_or_else(|| crate::Error::ScriptNotFound(bin_name.to_owned()))?;
 
-    let mut cmd = process::Command::new(&paths.cargo_exe);
+    let mut cmd = process::Command::new(&cfg.cargo_exe);
     cmd.args([
         "run",
         "--bin",
@@ -66,33 +67,38 @@ pub fn run_script(bin_name: &str, args: &[String], paths: &config::Config) -> cr
 }
 
 pub fn new_script(
-    bin_name: &str,
+    input_bin_name: &str,
     template_name: &str,
-    paths: &config::Config,
+    cfg: &config::Config,
 ) -> crate::Result<()> {
-    let mut cargo_doc = CargoDotToml::read(&paths.cargo_dot_toml)?;
+    let mut cargo_doc = CargoDotToml::read(&cfg.cargo_dot_toml)?;
+
+    // remove trailing .rs in input bin name since it happens so much
+    // MAYBE: validate the name and resulting filename
+    //  What are the rules tho? Could this be delegated to `cargo` somehow?
+    let bin_name = input_bin_name.trim_end_matches(".rs");
 
     // copy the template to the destination if necessary
     let src_filename = _bin_name_to_src_filename(bin_name);
-    let dest = paths.manifest_dir.join(&src_filename);
+    let dest = cfg.manifest_dir.join(&src_filename);
     if dest.is_file() {
         cprintln!(
-            "<yellow>warning</yellow>: Script '{}' already exists",
-            paths.humanize(&dest)
+            "<yellow>warning</>: Script '{}' already exists",
+            cfg.relpath_project_root(&dest)
         );
     } else {
-        let template_path = paths.template_path(template_name);
-        _copy_file(&template_path, &dest)?;
+        let template_path = cfg.template_path(template_name);
+        util::copy_file(&template_path, &dest)?;
         cprintln!(
-            "<green>success</green>: Created script: {} -> {}",
-            paths.humanize(&template_path),
-            paths.humanize(&dest)
+            "<green>success</>: Created script: {} -> {}",
+            cfg.relpath_project_root(&template_path),
+            cfg.relpath_project_root(&dest)
         );
     }
 
     // update Cargo.toml
     cargo_doc.add_new_bin(bin_name, &src_filename)?;
-    _update_and_show_diff(&cargo_doc, &paths.cargo_dot_toml)?;
+    _update_and_show_diff(&cargo_doc, &cfg.cargo_dot_toml)?;
 
     Ok(())
 }
@@ -103,7 +109,7 @@ pub fn list_scripts(cfg: &config::Config) -> crate::Result<()> {
     let Some(script_iter) = cargo_doc.list_scripts() else {
         if cfg.verbosity > config::Quiet {
             cprintln!(
-                "<yellow>warning:</yellow> No [[bin]] entries found in {}",
+                "<yellow>warning:</> No [[bin]] entries found in {}",
                 cfg.cargo_dot_toml.display()
             );
         }
@@ -111,7 +117,12 @@ pub fn list_scripts(cfg: &config::Config) -> crate::Result<()> {
     };
 
     if cfg.verbosity > config::Quiet {
-        println!("Scripts in {}: \n", cfg.cargo_dot_toml.display());
+        // TODO: windows path style, probably need a custom formatter
+        cprintln!(
+            "<blue>manifest:</>{}/<cyan>{}</> \n",
+            cfg.cargo_dot_toml.parent().unwrap().display(),
+            cfg.cargo_dot_toml.file_name().unwrap().display()
+        );
     }
 
     for data::ScriptEntry {
@@ -120,10 +131,16 @@ pub fn list_scripts(cfg: &config::Config) -> crate::Result<()> {
         required_features,
     } in script_iter
     {
-        if cfg.verbosity == config::Quiet {
-            println!("{name}");
+        if cfg.verbosity > config::Quiet {
+            cprintln!(
+                "\
+- <green>{name}</>:
+    <blue>path:</> {path}
+    <blue>dependencies:</> {required_features:?}
+"
+            );
         } else {
-            println!("{name}:\n  path: {path}\n  dependencies: {required_features:?}\n");
+            println!("{name}");
         }
     }
     Ok(())
@@ -133,25 +150,29 @@ pub fn inject_deps(
     bin_name: &str,
     deps: &[data::DepRequest],
     features: &[data::FeatureRequest],
-    paths: &config::Config,
+    cfg: &config::Config,
     cargo_add_args: &CargoAddArgs,
 ) -> crate::Result<()> {
-    // PROBABLY: check whether deps already in manifest before running cargo add?
+    if deps.is_empty() && features.is_empty() {
+        return Ok(());
+    }
 
     // first: add the dependencies
+    // PROBABLY: also check whether deps already in manifest?
     if !deps.is_empty() {
         // NOTE that cargo automatically adds a feature
         //  for every optional dependency, however this is not
         //  actually necessary - the dep name can be listed
         //  directly as a "required-feature" (without even
         //  the `dep:` qualifier, for whatever reason)
-        let cargo_add_result = _run_cmd(
-            process::Command::new(&paths.cargo_exe)
-                .current_dir(&paths.manifest_dir)
-                .args(["add", "--optional"])
-                .args(cargo_add_args.cli_args())
-                .args(deps.iter().map(|d| &d.input_string)),
-        )?;
+        let mut cmd = process::Command::new(&cfg.cargo_exe);
+        cmd.current_dir(&cfg.manifest_dir)
+            .args(["add", "--optional"])
+            .args(cargo_add_args.cli_args())
+            .args(deps.iter().map(|d| &d.input_string));
+        util::show_invocation(&cmd);
+        let cargo_add_result = cmd.spawn()?.wait()?;
+
         if !cargo_add_result.success() {
             return Err(crate::Error::CargoFail(format!(
                 "`cargo add` command reported failure (status:  {cargo_add_result})"
@@ -160,59 +181,18 @@ pub fn inject_deps(
     }
 
     // read the new (possibly modified) manifest
-    let mut cargo_doc = CargoDotToml::read(&paths.cargo_dot_toml)?;
+    let mut cargo_doc = CargoDotToml::read(&cfg.cargo_dot_toml)?;
 
     // mutate it (in memory)
     cargo_doc.activate_features(bin_name, deps, features)?;
 
     // update the file on disk
-    _update_and_show_diff(&cargo_doc, &paths.cargo_dot_toml)?;
+    _update_and_show_diff(&cargo_doc, &cfg.cargo_dot_toml)?;
 
     Ok(())
 }
 
 // ───── Helpers ────────────────────────────────────────────────── //
-fn _copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
-    fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
-        src: src.display().to_string(),
-        dest: dest.display().to_string(),
-        err: e,
-    })?;
-
-    Ok(())
-}
-
-/// print the command then run it
-fn _run_cmd(cmd: &mut process::Command) -> std::io::Result<process::ExitStatus> {
-    // Attempt to print the command before running it.
-    // if any of these strings can't be represented in unicode,
-    // this will panic (probably good tbh)
-    let cmd_str = cmd.get_program().to_str().unwrap().to_owned();
-    // TODO: probably this can just be the filename ...
-
-    let mut arg_display = String::new();
-    for arg in cmd.get_args().map(|s| s.to_str().unwrap()) {
-        // This is a very, VERY bad "shell" "quoting" "algorithm".
-        // But it's for display only, seems silly to
-        // to bring in a whole-ass dependency for it.
-        let wrap_in_quotes = arg.contains(' ');
-        arg_display.push(' ');
-        if wrap_in_quotes {
-            arg_display.push('\'');
-        }
-        arg_display.push_str(arg);
-        if wrap_in_quotes {
-            arg_display.push('\'');
-        }
-    }
-    cprintln!(
-        "<cyan>running:</cyan>\n<blue>$</blue> <green>{}</green>{}",
-        cmd_str,
-        arg_display
-    );
-    cmd.spawn()?.wait()
-}
-
 fn _bin_name_to_src_filename(bin_name: &str) -> String {
     format!("src/{}.rs", bin_name.replace('-', "_"))
 }
@@ -220,7 +200,7 @@ fn _bin_name_to_src_filename(bin_name: &str) -> String {
 fn _update_and_show_diff(toml: &CargoDotToml, target: &Path) -> crate::errors::Result<()> {
     // back it up first
     let backup = target.with_added_extension("bak");
-    _copy_file(target, &backup)?;
+    util::copy_file(target, &backup)?;
 
     // overwrite cargo.toml
     toml.write(target)?;
@@ -228,15 +208,16 @@ fn _update_and_show_diff(toml: &CargoDotToml, target: &Path) -> crate::errors::R
     // TODO: better output if cargo.toml didn't change
     println!("Updated Cargo.toml: ");
 
+    let mut cmd = process::Command::new("diff");
+    cmd.current_dir(target.parent().unwrap())
+        .arg("--color=always") // TODO: this should be controlled globally
+        .args([&backup, target]);
+    util::show_invocation(&cmd);
+
     // we are ignoring any failure to run `diff` here
     // since it's only for illustrative purpose
     // and the file has already been modified
-    let _ = _run_cmd(
-        process::Command::new("diff")
-            .current_dir(target.parent().unwrap())
-            .arg("--color=always") // TODO: only pass this if we are running in a TTY
-            .args([&backup, target]),
-    );
+    let _ = cmd.spawn()?.wait();
 
     Ok(())
 }

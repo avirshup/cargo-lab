@@ -36,6 +36,16 @@ pub enum Error {
     #[error("Failed to parse CLI argument '{0}'")]
     InputErr(String),
 
+    #[error("{0}")]
+    Unhandled(String),
+
+    #[error("Failed to automatically install completions for {shell}: {reason}.\n {guidance}")]
+    AutocompleteFail {
+        shell: String,
+        reason: &'static str,
+        guidance: &'static str,
+    },
+
     #[error("Encountered multiple errors")] // TODO: display them
     MultipleErrors(Vec<Error>),
 }
