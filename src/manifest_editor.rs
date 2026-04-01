@@ -1,6 +1,5 @@
 use std::collections::HashSet;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use all_the_errors::CollectAllTheErrors;
 use serde::Deserialize;
@@ -17,14 +16,12 @@ pub struct ManifestEditor {
 
 impl ManifestEditor {
     // ───── Constructors ─────
-
-    #[allow(unused)] // generally replaced by ConfigLoader
-    pub fn read(path: PathBuf) -> crate::Result<Self> {
-        let toml_content = fs::read_to_string(&path).map_err(|ioerr| {
-            crate::ioerr!(ioerr, "Failed to read '{}'", path.to_string_lossy())
-        })?;
-        let doc = toml_content.parse::<toml_edit::DocumentMut>()?;
-        Ok(Self { doc })
+    #[allow(unused)] // for testing?
+    /// Create a new in-memory "manifest" with nothing in it
+    pub fn blank() -> Self {
+        Self {
+            doc: toml_edit::DocumentMut::new(),
+        }
     }
 
     pub fn from_string(content: &str) -> crate::Result<Self> {
@@ -38,14 +35,7 @@ impl ManifestEditor {
     }
 
     pub fn write(&self, target: &Path) -> crate::Result<()> {
-        fs::write(target, self.render()).map_err(|ioerr| {
-            crate::ioerr!(
-                ioerr,
-                "Failed to write to {}",
-                target.to_string_lossy()
-            )
-        })?;
-        Ok(())
+        util::write_file(target, &self.render())
     }
 
     /// reify the current state of this editable document into a concrete data object
@@ -60,7 +50,7 @@ impl ManifestEditor {
     }
 
     // ───── Queries ─────
-    // TODO: these are probably not necessary anymore - just use the serde
+    // TODO: these are probably not necessary anymore - use the serde
     //   deserializer for this. They are still useful for testing tho
     #[allow(unused)]
     pub fn get_script(&self, input_name: &str) -> Option<data::ScriptEntry> {

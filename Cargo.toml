@@ -10,14 +10,14 @@ experimental_cargo_script_rfc3502 = ["dep:winnow"]
 [dependencies]
 all-the-errors = "0.1.1" # my crate
 
-# Trust: highest (all are deps of cargo itself except where noted)
+# Trust: highest (all are deps of cargo itself
 anstream = "1.0.0"
 anstyle = "1.0.14"
 annotate-snippets = "0.12.13"
-cfg-if = "1.0.4"  # owned by core rust org
 clap = { version = "4.6.0", features = ["derive", "wrap_help", "color", "string"] }
 clap_complete = { version = "4.6.0", features = ["unstable-dynamic"] }
 color-print = "0.3.7"
+rand = "0.10.1"
 toml_edit = { version = "0.25.11", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"

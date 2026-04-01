@@ -3,34 +3,6 @@ use std::{fs, process};
 
 use color_print::ceprintln;
 
-pub fn read_file(src: &Path) -> crate::Result<String> {
-    fs::read_to_string(src).map_err(|ioerr| {
-        crate::ioerr!(ioerr, "Failed to read '{}'", src.to_string_lossy(),)
-    })
-}
-
-pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
-    fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
-        src: src.display().to_string(),
-        dest: dest.display().to_string(),
-        err: e.to_string(),
-    })?;
-
-    Ok(())
-}
-
-pub fn run_subproc(
-    mut cmd: process::Command,
-) -> crate::Result<process::ExitStatus> {
-    let mut child = cmd.spawn().map_err(|ioerr| {
-        crate::ioerr!(ioerr, "Failed to spawn process '{cmd:?}'")
-    })?;
-
-    child.wait().map_err(|ioerr| {
-        crate::ioerr!(ioerr, "Wait failed for '{cmd:?}' (pid={})", child.id())
-    })
-}
-
 /// A rough attempt to print the subprocess invocations we're about to run.
 /// TODO: this should be controlled via verbosity level
 pub fn show_invocation(cmd: &process::Command) {
@@ -74,4 +46,70 @@ pub fn show_invocation(cmd: &process::Command) {
 /// (i.e., 2 names "match" if they both canonicalize to the same string)
 pub fn canonicalize_crate_name(s: &str) -> String {
     s.to_lowercase().replace('-', "_")
+}
+
+/// Why not built-in?
+pub fn join_str_iter<'a, 'b>(
+    mut iter: impl Iterator<Item = &'a str>,
+    sep: &'b str,
+) -> String {
+    let Some(mut result) = iter.next().map(str::to_owned) else {
+        return String::new();
+    };
+
+    for item in iter {
+        result.push_str(sep);
+        result.push_str(item);
+    }
+
+    result
+}
+
+// ───── Wrappers around stdlib with our own error handling ─────── //
+// we can't just use a From trait for these because afaict io::Error doesn't provide
+// enough context to build a good error message (like, e.g., the name of the file)
+
+pub fn write_file(dest: &Path, content: &str) -> crate::Result<()> {
+    fs::write(dest, content).map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Failed to write to {}", dest.to_string_lossy())
+    })
+}
+
+pub fn read_file(src: &Path) -> crate::Result<String> {
+    fs::read_to_string(src).map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Failed to read '{}'", src.to_string_lossy(),)
+    })
+}
+
+pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
+    fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
+        src: src.display().to_string(),
+        dest: dest.display().to_string(),
+        err: e.to_string(),
+    })?;
+
+    Ok(())
+}
+
+pub fn run_subproc(
+    mut cmd: process::Command,
+) -> crate::Result<process::ExitStatus> {
+    let mut child = cmd.spawn().map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Failed to spawn process '{cmd:?}'")
+    })?;
+
+    child.wait().map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Wait failed for '{cmd:?}' (pid={})", child.id())
+    })
+}
+
+pub fn create_dir(path: &Path) -> crate::Result<()> {
+    fs::create_dir(path).map_err(|ioerr| {
+        crate::ioerr!(
+            ioerr,
+            "Failed to create directory at '{}'",
+            path.to_string_lossy()
+        )
+    })?;
+    Ok(())
 }

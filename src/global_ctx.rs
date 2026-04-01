@@ -26,7 +26,7 @@ pub enum Verbosity {
     Debug,
 }
 
-type CachedResult<'a, T> = Result<T, &'a crate::Error>;
+type CachedResult<'a, T> = Result<&'a T, &'a crate::Error>;
 
 /// Loads configuration values as needed for a given operation.
 ///
@@ -55,7 +55,7 @@ pub struct GlobalCtx {
     pub cwd: PathBuf,
     pub cargo_exe: PathBuf,
 
-    _override_manifest_path: Option<PathBuf>,
+    _override_manifest_path: Option<String>,
     _project_paths: OnceCell<crate::Result<ProjectPaths>>,
     _manifest_raw: OnceCell<crate::Result<String>>,
     _manifest_data: OnceCell<crate::Result<ManifestData>>,
@@ -72,7 +72,7 @@ impl GlobalCtx {
     /// Currently panics if CWD doesn't exist.
     pub fn new(
         verbosity: Verbosity,
-        override_manifest_path: Option<PathBuf>,
+        override_manifest_path: Option<String>,
     ) -> Self {
         let cwd = current_dir()
             .map_err(|ioerr| crate::ioerr!(ioerr, "Failed to determine CWD"))
@@ -88,6 +88,20 @@ impl GlobalCtx {
             cargo_exe,
             _override_manifest_path: override_manifest_path,
             _project_paths: Default::default(),
+            _manifest_raw: Default::default(),
+            _manifest_data: Default::default(),
+            _playground_config: Default::default(),
+        }
+    }
+
+    /// Creates a new context with custom project paths
+    pub fn with_paths(&self, paths: ProjectPaths) -> GlobalCtx {
+        Self {
+            verbosity: self.verbosity,
+            cwd: self.cwd.clone(),
+            cargo_exe: self.cargo_exe.clone(),
+            _override_manifest_path: None,
+            _project_paths: OnceCell::from(Ok(paths)),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
             _playground_config: Default::default(),
@@ -112,11 +126,11 @@ impl GlobalCtx {
     }
 
     // ───── Paths ──────────────────────────────────────────────────── //
-    pub fn project_paths(&'_ self) -> CachedResult<'_, &ProjectPaths> {
+    pub fn project_paths(&'_ self) -> CachedResult<'_, ProjectPaths> {
         self._project_paths
             .get_or_init(|| {
                 if let Some(input_path) = &self._override_manifest_path {
-                    ProjectPaths::from_input(input_path)
+                    ProjectPaths::from_input_path(input_path)
                 } else {
                     ProjectPaths::discover(&self.cwd)
                 }
@@ -125,17 +139,17 @@ impl GlobalCtx {
     }
 
     // ───── Manifest data ──────────────────────────────────────────── //
-    pub fn manifest_raw(&'_ self) -> CachedResult<'_, &String> {
+    pub fn manifest_raw(&'_ self) -> CachedResult<'_, str> {
         self._manifest_raw
             .get_or_init(|| {
                 self.project_paths()
                     .map_err(Clone::clone)
                     .and_then(|paths| util::read_file(&paths.cargo_dot_toml))
             })
-            .as_ref()
+            .as_deref()
     }
 
-    pub fn manifest_data(&'_ self) -> CachedResult<'_, &ManifestData> {
+    pub fn manifest_data(&'_ self) -> CachedResult<'_, ManifestData> {
         self._manifest_data
             .get_or_init(|| {
                 self.manifest_raw().map_err(Clone::clone).and_then(|s| {
@@ -162,48 +176,46 @@ impl GlobalCtx {
     pub fn new_editor(&self) -> crate::Result<ManifestEditor> {
         self.manifest_raw()
             .map_err(Clone::clone)
-            .and_then(|s| ManifestEditor::from_string(s))
+            .and_then(ManifestEditor::from_string)
     }
 }
 
+/// Paths for a given playground project.
+///
+/// This struct's constructors will check that  `manifest_dir` is
+/// a directory that exists (at construction time anyway), but none
+/// of the other paths are checked.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive] // <- require use of constructors
 pub struct ProjectPaths {
     pub manifest_dir: PathBuf,
     pub template_dir: PathBuf,
     pub cargo_dot_toml: PathBuf,
+    pub script_dir: PathBuf,
 }
 
 impl ProjectPaths {
     // ───── Constructors ───────────────────────────────────────────── //
-    pub fn from_input(input_path: &Path) -> crate::Result<Self> {
-        if input_path.is_dir() {
-            // They passed a directory, we're gtg
-            Ok(Self::_from_manifest_dir_path(input_path.to_owned()))
-        } else if input_path.is_file()
+
+    /// Find path to the project based on user's explicit input
+    pub fn from_input_path(input_str: &str) -> crate::Result<Self> {
+        let input_path: PathBuf = input_str.into();
+
+        let normalized_path = if input_path.is_file()
             && input_path.file_name() == Some(OsStr::new("Cargo.toml"))
         {
-            // They passed a path to a Cargo.toml file, that's fine too
-            Ok(Self::_from_manifest_dir_path(
-                input_path.parent().unwrap().to_owned(),
-            ))
-        } else if !input_path.exists() {
-            Err(crate::Error::FileErr {
-                description: "Provided manifest path does not exist".to_owned(),
-                path: input_path.to_string_lossy().into(),
-            })
+            input_path.parent().unwrap()
         } else {
-            Err(crate::Error::FileErr {
-                description: "Provided manifest path is not a directory or \
-                              manifest file"
-                    .to_owned(),
-                path: input_path.to_string_lossy().into(),
-            })
-        }
+            &input_path
+        };
+
+        Self::from_manifest_dir(normalized_path)
     }
 
+    /// Try to figure out which project path the user wants, based on env vars and CWD.
     pub fn discover(cwd: &Path) -> crate::Result<Self> {
-        if let Ok(path) = _getenv(CARGO_PLAYGROUND_MANIFEST_DIR) {
-            return Ok(Self::_from_manifest_dir_path(path));
+        if let Ok(path) = _getenv::<PathBuf>(CARGO_PLAYGROUND_MANIFEST_DIR) {
+            return Self::from_manifest_dir(&PathBuf::from(path));
         }
 
         #[cfg(feature = "xtask")]
@@ -214,17 +226,39 @@ impl ProjectPaths {
                     .expect("`CARGO_MANIFEST_DIR` parent exists"),
             )
         {
-            return Ok(Self::_from_manifest_dir_path(path));
+            return Self::from_manifest_dir(&PathBuf::from(path));
         }
 
         _first_parent_dir_with_a_manifest_in_it(cwd)
-            .map(Self::_from_manifest_dir_path)
+            .map(Self::_from_manifest_dir_path_unchecked)
     }
 
-    fn _from_manifest_dir_path(path: PathBuf) -> Self {
+    /// Construct project paths from the path to the manifest dir, ensuring
+    /// that it really is a readable directory.
+    pub fn from_manifest_dir(path: &Path) -> crate::Result<Self> {
+        if path.is_dir() {
+            // They passed a directory, we're gtg
+            Ok(Self::_from_manifest_dir_path_unchecked(path.to_owned()))
+        } else if !path.exists() {
+            Err(crate::Error::FileErr {
+                path: path.to_string_lossy().into(),
+                description: "provided manifest path does not exist".to_owned(),
+            })
+        } else {
+            Err(crate::Error::FileErr {
+                description: "provided manifest path is not a directory or \
+                              manifest file"
+                    .to_owned(),
+                path: path.to_string_lossy().into(),
+            })
+        }
+    }
+
+    fn _from_manifest_dir_path_unchecked(path: PathBuf) -> Self {
         Self {
             cargo_dot_toml: path.join("Cargo.toml"),
             template_dir: path.join("templates"),
+            script_dir: path.join("src"),
             manifest_dir: path,
         }
     }
@@ -337,7 +371,7 @@ mod tests {
             verbosity: Debug,
             cwd: "/tmp".into(),
             cargo_exe: "cargo".into(),
-            _override_manifest_path: Some(PathBuf::from("/tmp/project")),
+            _override_manifest_path: Some("/tmp/project".to_owned()),
             _project_paths: Default::default(),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),

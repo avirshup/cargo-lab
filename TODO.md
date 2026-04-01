@@ -39,15 +39,26 @@
 - [x] Cargo.toml discovery
     - [x] configurable **Cargo.toml location** via env var or CLI,
       so you can use it from anywhere (`CARGO_PLAYGROUND_MANIFEST_PATH`)
-- [ ] "Naming support"
-    - [ ] `cpg new`: generate a name creating a project if not specified (this
-      breaks the current CLI tho)
+- [x] "Naming support"
+    - [x] name generator: done (lifted naming scheme directly from docker).
+    - [x] ~~`cpg new`: generate a name when creating a project if not
+      specified?~~ no.
+        - BUT: then there is no way to specify dependencies with an anonymous new
+          project. Can we say that you have to specify deps via "--dep" in this case?
+          alternative 1: always require `--dep` / `-d`, take a list like w/ features
+          (makes us different than how cargo does it).
+          alternative 2: optionally allow `--dep/-d`, require it for anonymous
+          scripts (leads to confusing usage messages). **alternative 3**: use a
+          different command (`cpg quick`?) to make it explicit.
+    - [x] `cpg quick`
     - [ ] `cpg rename`
-- [ ] "play with a crate" workflow
-    - [ ] `cpg play-with $depname`: creates new automatically named script
+- [x] "play with a crate" workflow
+    - [x] ~~`cpg play-with $depname`~~
+      `cpg quick [dupname]` creates new automatically named script
       with proper dependencies (and a `use` at the top? no, we don't actually
       know the crate name)
-    - [ ] opens API docs in browser?
+    - [x] ~~opens API docs in browser?~~ nah
+- [ ] finish splitting this into its own repo
 - [ ] Alfred workflow W/ same autocomplete support as terminal (for me anyway)
 
 ## Functionality
@@ -121,6 +132,8 @@
 - [ ] 
   `cargo script` support - manage an ["embedded manifest"](https://rust-lang.github.io/rfcs/3502-cargo-script.html) and keep it
   in sync w/ our `Cargo.toml`
+- [ ] add (optionalyl) "extern crate" statements and/or comments to the
+  top of each script when dependencies and/or features are added?
 - [ ] use styles from `cli_style` for output everywhere
 - [ ]  `cargo playground init` -
   to create a whole-ass new project or enable metadata on existing one

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::builder::Styles;
 use clap::{Args, Parser, Subcommand};
 
@@ -13,6 +11,10 @@ use super::feature_parsers::{
 use crate::vendor_cargo::style;
 use crate::{build_passthrough_long_args, data};
 
+attribute_alias! {
+   #[apply(DeriveArg)] = #[derive(Clone, Debug)];
+}
+
 const STYLES: Styles = Styles::styled()
     .header(style::HEADER)
     .usage(style::USAGE)
@@ -22,8 +24,9 @@ const STYLES: Styles = Styles::styled()
     .valid(style::VALID)
     .invalid(style::INVALID);
 
-/// Manage scripts and dependencies in a playground project
-#[derive(Debug, Parser)]
+/// Manage script playgrounds as cargo projects
+#[apply(DeriveArg)]
+#[derive(Parser)]
 #[command(version, about, long_about = None, styles = STYLES)]
 pub struct MainCli {
     #[command(subcommand)]
@@ -33,7 +36,8 @@ pub struct MainCli {
     pub global_args: GlobalArgs,
 }
 
-#[derive(Args, Clone, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct GlobalArgs {
     /// Path to the playground's manifest directory
     #[arg(
@@ -42,7 +46,7 @@ pub struct GlobalArgs {
         value_name = "PATH",
         add = manifest_path_completer()
     )]
-    pub manifest_path: Option<PathBuf>,
+    pub manifest_path: Option<String>,
 
     /// Use verbose output (-vv = debugging output)
     #[arg(
@@ -60,8 +64,13 @@ pub struct GlobalArgs {
 }
 
 // ───── Top-level subcmd enum ──────────────────────────────────── //
-#[derive(Clone, Subcommand, Debug)]
+#[apply(DeriveArg)]
+#[derive(Subcommand)]
 pub enum SubCmd {
+    /// Create a new playground
+    #[command(name = "init")]
+    InitPlayground(InitPlayground),
+
     /// Run a script
     #[command(name = "run")]
     RunScript(RunScript),
@@ -69,6 +78,10 @@ pub enum SubCmd {
     /// Create a new script
     #[command(name = "new")]
     NewScript(NewScript),
+
+    /// Create a new script with a random name
+    #[command(name = "quick")]
+    QuickScript(NewScriptOpts),
 
     /// List the scripts declared in `Cargo.toml`
     #[command(name = "list")]
@@ -101,6 +114,36 @@ pub enum SubCmd {
 // ──────────────────────────────────────────────────────────────────────── //
 // ───── Subcommands                                                 ───── //
 // ──────────────────────────────────────────────────────────────────────── //
+/// Create a new playground
+#[apply(DeriveArg)]
+#[derive(Args)]
+pub struct InitPlayground {
+    /// Path to initialize a as playground.
+    ///
+    /// Can be: a path that does not exist, an empty directory, or
+    /// an existing cargo project (must also pass `--existing`)
+    #[arg()]
+    pub path: String,
+
+    // // TODO: either use arg group to make `--existing` mutually
+    // //   exclusive of others, or make separate commands
+    // /// Name of the playground "package", if not already set.
+    // /// (defaults to "{directory-name}-playground")
+    // #[arg(action=clap::ArgAction::SetTrue)]
+    // pub existing: bool,
+    //
+    /// Name of the playground "package", if not already set.
+    /// (defaults to "{directory-name}-playground")
+    #[arg()]
+    pub name: Option<String>,
+
+    /// Rust edition to use (default: "2024")
+    /// Ignored if `--existing` is passed.
+    // TODO: enforce rather than ignore
+    #[arg(default_value = "2024")]
+    pub edition: String,
+}
+
 /// Run an existing script from the playground
 #[derive(Args, Clone, Debug)]
 pub struct RunScript {
@@ -116,13 +159,24 @@ pub struct RunScript {
 }
 
 /// Create a new playground script
-#[derive(Args, Clone, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct NewScript {
-    #[arg(help = "name of the script to create", value_name = "SCRIPT")]
+    /// Name of the script to create (optional).
+    /// If not provided, a random human-readable name will be generated
+    #[arg(value_name = "SCRIPT")]
     pub script_name: String,
 
-    #[arg(short, long, default_value = "bare", add = template_name_completer())]
-    pub template: String,
+    #[command(flatten)]
+    pub opts: NewScriptOpts,
+}
+
+/// All the arguments for new scripts except its name.
+#[apply(DeriveArg)]
+#[derive(Args)]
+pub struct NewScriptOpts {
+    #[arg(short, long, add = template_name_completer())]
+    pub template: Option<String>,
 
     #[arg(
         long,
@@ -143,7 +197,8 @@ pub struct NewScript {
 //   `#[cfg(feature)]` attributes (or not, those are very noisy-looking)
 
 /// Add dependencies for a srcipt
-#[derive(Clone, Args, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct InjectDeps {
     #[arg(
         help = "name of the script to add dependencies to",
@@ -166,7 +221,8 @@ pub struct InjectDeps {
 }
 
 /// Print information about script
-#[derive(Clone, Args, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct ShowScriptInfo {
     #[arg(
         add = script_name_completer(),
@@ -175,7 +231,8 @@ pub struct ShowScriptInfo {
 }
 
 /// Open script in editor
-#[derive(Clone, Args, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct EditScript {
     #[arg(
         help = "name of the script to edit",
@@ -201,7 +258,8 @@ Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set."
 /// Print CLI completion script to stdout.
 ///
 /// TODO: instructions on how to install / activate
-#[derive(Clone, Args, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct WriteCompletionScript {
     // TODO: list supported shells (
     // see `clap_complete::env::Shells::builtins()`)
@@ -209,7 +267,8 @@ pub struct WriteCompletionScript {
     pub shell: String,
 }
 
-#[derive(Clone, Args, Debug)]
+#[apply(DeriveArg)]
+#[derive(Args)]
 pub struct InjectArgs {
     #[arg(
         help = "Dependencies, with optional versions",

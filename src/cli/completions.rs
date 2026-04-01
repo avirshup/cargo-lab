@@ -69,10 +69,11 @@ pub fn template_name_completer() -> ArgValueCandidates {
 fn _completion_ctx() -> GlobalCtx {
     // if manifest path already specified in CLI args, use it
     // but only if it actually exists
-    let maybe_manifest_path =
-        _maybe_get_manifest_path_from_argv().filter(|p| p.exists());
 
-    GlobalCtx::new(Verbosity::NearlySilent, maybe_manifest_path)
+    GlobalCtx::new(
+        Verbosity::NearlySilent,
+        _maybe_get_manifest_path_from_argv(),
+    )
 }
 
 // this must match `cli::parser::GlobalArgs`
@@ -86,7 +87,7 @@ const MANIFEST_PATH_FLAG: &str = "--manifest-path";
 /// Although I suppose it makes some strong assumptions about the CLI args
 /// are formatted that may not be true in, like, powershell or something?
 ///
-fn _maybe_get_manifest_path_from_argv() -> Option<PathBuf> {
+fn _maybe_get_manifest_path_from_argv() -> Option<String> {
     let mut arg_iter = env::args_os();
 
     while let Some(osarg) = arg_iter.next() {
@@ -95,12 +96,12 @@ fn _maybe_get_manifest_path_from_argv() -> Option<PathBuf> {
         if let Some(rest) = arg.strip_prefix(MANIFEST_PATH_FLAG) {
             return if rest.is_empty() {
                 // "--manifest-path [path]"
-                arg_iter.next().map(PathBuf::from)
+                arg_iter.next().map(|osstr| osstr.to_string_lossy().into())
             } else if let Some(val) = rest.strip_prefix('=')
                 && !val.is_empty()
             {
                 // "--manifest-path [path]"
-                Some(PathBuf::from(val))
+                Some(val.into())
             } else {
                 // of the form "--manifest-path[unexpected characters]"
                 None
@@ -184,7 +185,7 @@ pub fn print_completion_script(
     shell_name: &str,
     mut dest: impl io::Write,
 ) -> crate::Result<()> {
-    // FIXME: does this work as a cargo subcommand?
+    // FIXME: does this work as a cargo subcommand? Check
 
     let shells = Shells::builtins();
     let completer = shells
