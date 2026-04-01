@@ -16,6 +16,9 @@ pub enum Error {
     },
 
     #[error("{0}")]
+    AlreadyExists(String),
+
+    #[error("{0}")]
     CargoFail(String),
 
     #[error("{0}")]
@@ -31,7 +34,7 @@ pub enum Error {
     AmbiguousFeature(String),
 
     #[error("Failed to parse CLI argument '{0}'")]
-    InputError(String),
+    InputErr(String),
 
     #[error("Encountered multiple errors")] // TODO: display them
     MultipleErrors(Vec<Error>),

@@ -65,7 +65,7 @@ impl CargoDotToml {
             .iter()
             .any(|table| table["name"].as_str() == Some(bin_name))
         {
-            return Err(crate::Error::ManifestCorrupt(format!(
+            return Err(crate::Error::AlreadyExists(format!(
                 "Bin with name '{bin_name}' already exists"
             )));
         };
@@ -193,17 +193,17 @@ impl CargoDotToml {
         })
     }
 
-    pub fn find_bin_name(&self, input_name: &str) -> Option<&str> {
-        let canonicalized_input = _canonicalize_name(input_name);
-
-        self.0
-            .get("bin")?
-            .as_array_of_tables()?
-            .iter()
-            .filter_map(|table| table.get("name"))
-            .filter_map(Item::as_str)
-            .find(|realname| _canonicalize_name(realname) == canonicalized_input)
-    }
+    // pub fn find_bin_name(&self, input_name: &str) -> Option<&str> {
+    //     let canonicalized_input = _canonicalize_name(input_name);
+    //
+    //     self.0
+    //         .get("bin")?
+    //         .as_array_of_tables()?
+    //         .iter()
+    //         .filter_map(|table| table.get("name"))
+    //         .filter_map(Item::as_str)
+    //         .find(|realname| _canonicalize_name(realname) == canonicalized_input)
+    // }
 
     fn table_to_script_entry(table: &Table) -> ScriptEntry<'_> {
         ScriptEntry {

@@ -1,0 +1,36 @@
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+pub struct ArgParser {
+    #[command(subcommand)]
+    pub cmd: SubCmd,
+}
+
+#[derive(Clone, Subcommand)]
+pub enum SubCmd {
+    #[command(name = "foo")]
+    Foo {
+        #[arg(long, help = "all about foo", default_value = "3")]
+        num_foos: usize,
+    },
+
+    #[command(name = "bar")]
+    Bar {
+        #[arg(help = "all about bar")]
+        bar_name: String,
+    },
+}
+
+fn main() {
+    let args = ArgParser::parse();
+
+    match args.cmd {
+        SubCmd::Foo { num_foos } => {
+            println!("Ha! Ha! There are {num_foos} foos!");
+        }
+        SubCmd::Bar { bar_name } => {
+            println!("Ha! Ha! Your bar's name is \"{bar_name}\"!");
+        }
+    }
+}

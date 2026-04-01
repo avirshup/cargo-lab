@@ -4,10 +4,29 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.6.0", features = ["derive", "wrap_help"] }
+
+# Trust: highest
+anstream = "1.0.0"  # dependend on by cargo
+color-print = "0.3.7"  # dependend on by cargo, part of anstream
+cfg-if = "1.0.4"  # owned by core rust org
+clap = { version = "4.6.0", features = ["derive", "wrap_help"] }  # foundational
+toml_edit = "0.25.8" # dependend on by cargo
+thiserror = "2.0.18" # foundational
+
+# My own crate
 all-the-errors = "0.1.1"
-toml_edit = "0.25.8"
-thiserror = "2.0.18"
+
+#[dependencies.cargo_metadata] # Trust: high
+## + recommended by "the cargo book"
+## + known author
+## + well audited: https://lib.rs/crates/cargo_metadata/audit
+## - not as highly used as the others
+#version = "0.23.1"
+## Do we need this? Seems like a lot of overhead
+## just to validate feature names.
+
+[features]
+xtask = []  # for use as an "xtask" in a subfolder of the project root
 
 [[bin]]
 path = "src/main.rs"

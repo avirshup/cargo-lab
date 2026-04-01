@@ -1,29 +1,42 @@
 mod cli;
 mod commands;
+mod config;
 mod data;
 mod errors;
 mod manifest_editor;
+mod passthrough_arg_macro;
 
 use all_the_errors::CollectAllTheErrors;
 
 use crate::cli::{ArgParser, SubCmd};
 use crate::errors::{Error, Result};
 use clap::Parser;
-use data::ProjectPaths;
+use config::Config;
 
 fn main() -> Result<()> {
     let args = ArgParser::parse();
-    let paths = ProjectPaths::from_env();
+
+    let verbosity = match (args.general.quiet, args.general.verbose) {
+        (true, _) => config::Quiet,
+        (false, 0) => config::Normal,
+        (false, 1) => config::Verbose,
+        (false, _more_than_1) => config::Debug,
+    };
+    let cfg = Config::from_env(verbosity);
+
+    if cfg.verbosity >= config::Verbose {
+        println!("{cfg:#?}");
+    }
 
     match args.cmd {
         SubCmd::RunScript { bin_name, args } => {
-            commands::run_script(&bin_name, &args, &paths)?;
+            commands::run_script(&bin_name, &args, &cfg)?;
         }
         SubCmd::NewScript { bin_name, template } => {
-            commands::new_script(&bin_name, &template, &paths)?;
+            commands::new_script(&bin_name, &template, &cfg)?;
         }
-        SubCmd::ListScripts { quiet } => {
-            commands::list_scripts(quiet, &paths)?;
+        SubCmd::ListScripts {} => {
+            commands::list_scripts(&cfg)?;
         }
         SubCmd::InjectDeps {
             bin_name,
@@ -48,12 +61,13 @@ fn main() -> Result<()> {
             // ensure all requested features have a dependency
             let features: Vec<data::FeatureRequest> = input_features
                 .into_iter()
-                .map(cli::FeatureCliArg::to_feature_req)
+                .map(cli::FeatureCliArg::into_feature_req)
                 .collect_oks_or_iter_errs()
                 .map_err(Error::from_nonempty_iter)?;
 
-            commands::inject_deps(&bin_name, &input_deps, &features, &paths, &cargo_add_args)?;
+            commands::inject_deps(&bin_name, &input_deps, &features, &cfg, &cargo_add_args)?;
         }
+        SubCmd::DoNothing {} => (),
     };
 
     Ok(())
