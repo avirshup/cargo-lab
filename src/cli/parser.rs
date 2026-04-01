@@ -1,3 +1,4 @@
+use camino::Utf8PathBuf;
 use clap::builder::Styles;
 use clap::{Args, Parser, Subcommand};
 
@@ -79,9 +80,13 @@ pub enum SubCmd {
     #[command(name = "new")]
     NewScript(NewScript),
 
-    /// Create a new script with a random name
+    /// Create a new script with an automatically generated name
     #[command(name = "quick")]
     QuickScript(NewScriptOpts),
+
+    /// Rename script
+    #[command(name = "rename")]
+    RenameScript(RenameScript),
 
     /// List the scripts declared in `Cargo.toml`
     #[command(name = "list")]
@@ -123,7 +128,7 @@ pub struct InitPlayground {
     /// Can be: a path that does not exist, an empty directory, or
     /// an existing cargo project (must also pass `--existing`)
     #[arg()]
-    pub path: String,
+    pub path: Utf8PathBuf,
 
     // // TODO: either use arg group to make `--existing` mutually
     // //   exclusive of others, or make separate commands
@@ -191,29 +196,46 @@ pub struct NewScriptOpts {
     pub inject_args: InjectArgs,
 }
 
+/// Create a new playground script
+#[apply(DeriveArg)]
+#[derive(Args)]
+pub struct RenameScript {
+    /// Name of the script to be renamed
+    #[arg(value_name = "SCRIPT", add = script_name_completer())]
+    pub script_name: String,
+
+    /// New script name
+    #[arg(long, short)]
+    pub name: Option<String>,
+
+    /// New filename for this script
+    #[arg(long, short)]
+    pub path: Option<Utf8PathBuf>,
+
+    /// Open the script in editor after this operation.
+    ///
+    /// (`package.metadata.cargo-playground.editor-cmd` must be set in the manifest.)"
+    #[arg(long)]
+    pub edit: bool,
+}
+
 // TODO: scripts should say which dependencies they have available?
 //   Maybe "--add-use-statements" to add those? Maybe keep
 //   commented-out cargo frontmatter up-to-date? Or maybe
 //   `#[cfg(feature)]` attributes (or not, those are very noisy-looking)
 
-/// Add dependencies for a srcipt
+/// Add dependencies and/or activate features for a script
 #[apply(DeriveArg)]
 #[derive(Args)]
 pub struct InjectDeps {
-    #[arg(
-        help = "name of the script to add dependencies to",
-        add = script_name_completer(),
-        value_name = "SCRIPT"
-    )]
+    /// name of the script to add dependencies to
+    #[arg(add = script_name_completer(), value_name = "SCRIPT")]
     pub script_name: String,
 
-    #[arg(
-        long,
-        help = "Open the script in editor after installing dependencies.",
-        long_help = "Open the script in editor after installing dependencies \
-                     (`package.metadata.cargo-playground.editor-cmd` must be \
-                     set in manifest.)"
-    )]
+    /// Open the script in editor after installing the dependencies.
+    ///
+    /// (`package.metadata.cargo-playground.editor-cmd` must be set in the manifest.)"
+    #[arg(long)]
     pub edit: bool,
 
     #[command(flatten)]
@@ -224,9 +246,7 @@ pub struct InjectDeps {
 #[apply(DeriveArg)]
 #[derive(Args)]
 pub struct ShowScriptInfo {
-    #[arg(
-        add = script_name_completer(),
-    )]
+    #[arg(add = script_name_completer())]
     pub script_name: String,
 }
 
@@ -234,23 +254,20 @@ pub struct ShowScriptInfo {
 #[apply(DeriveArg)]
 #[derive(Args)]
 pub struct EditScript {
-    #[arg(
-        help = "name of the script to edit",
-        add = script_name_completer(),
-        value_name = "SCRIPT"
-    )]
+    /// name of the script to edit
+    #[arg(add = script_name_completer(), value_name = "SCRIPT")]
     pub script_name: String,
 
+    /// Command to invoke editor
+    ///
+    /// Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set.
+    ///
+    /// All arguments after this flag ('--cmd') will be interpreted as
+    /// the arguments to invoke the editor.
     #[arg(
         long="cmd",
         allow_hyphen_values = true,
         num_args = 0..,
-        help = "Command to invoke editor",
-        long_help = "Custom command to invoke editor; \
-        all arguments after this flag ('--cmd') will be interpreted as \
-        the arguments to invoke the editor.
-
-Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set."
     )]
     pub editor_cmd: Option<Vec<String>>,
 }
@@ -263,7 +280,8 @@ Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set."
 pub struct WriteCompletionScript {
     // TODO: list supported shells (
     // see `clap_complete::env::Shells::builtins()`)
-    #[arg(help = "Shell name ('bash' / 'fish' / etc.)")]
+    /// Shell name ('bash' / 'fish' / etc.)
+    #[arg()]
     pub shell: String,
 }
 
@@ -308,7 +326,7 @@ build_passthrough_long_args!(
     /// We only forward these specific flags - rather than everything - because
     /// we need control over `--optional`, `--features`, etc.
     #[derive(Args, Clone, Debug)]
-    #[command(flatten_help=true)]
+    #[command(flatten_help = true)]
     pub struct CargoAddArgs {
         kv_flags(path, base, git, branch, tag, rev, registry),
         switch_flags(locked, offline, frozen),

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
-use std::path::Path;
 
 use all_the_errors::CollectAllTheErrors;
+use camino::Utf8Path;
 use serde::Deserialize;
 use serde::de::IntoDeserializer;
 use toml_edit::{Array, ArrayOfTables, Item, Table, TableLike, Value};
@@ -34,10 +34,12 @@ impl ManifestEditor {
         self.doc.to_string()
     }
 
-    pub fn write(&self, target: &Path) -> crate::Result<()> {
+    pub fn write(&self, target: &Utf8Path) -> crate::Result<()> {
         util::write_file(target, &self.render())
     }
 
+    // ───── Old methods for testing ────────────────────────────────── //
+    // TODO: remove these and update tests to use the ManifestData deserializer instead
     /// reify the current state of this editable document into a concrete data object
     /// (unlike `GlobalCtx.manifest_data()`, which deserializes the string that was read from disk)
     ///
@@ -51,7 +53,7 @@ impl ManifestEditor {
 
     // ───── Queries ─────
     // TODO: these are probably not necessary anymore - use the serde
-    //   deserializer for this. They are still useful for testing tho
+    //   deserializer for this. They are still useful for testing
     #[allow(unused)]
     pub fn get_script(&self, input_name: &str) -> Option<data::ScriptEntry> {
         let canon_name = util::canonicalize_crate_name(input_name);
@@ -72,6 +74,27 @@ impl ManifestEditor {
     }
 
     // ───── Mutators ─────
+    pub fn update_bin(
+        &mut self,
+        bin_name: &str,
+        maybe_new_name: Option<&str>,
+        maybe_new_path: Option<&str>,
+    ) -> crate::Result<()> {
+        let entry = self
+            ._get_bin_entry_mut(bin_name)
+            .ok_or_else(|| crate::Error::ScriptNotFound(bin_name.to_owned()))?;
+
+        if let Some(name) = maybe_new_name {
+            entry["name"] = name.into();
+        }
+
+        if let Some(path) = maybe_new_path {
+            entry["path"] = path.into();
+        }
+
+        Ok(())
+    }
+
     pub fn add_new_bin(
         &mut self,
         bin_name: &str,
@@ -268,7 +291,7 @@ impl ManifestEditor {
 
         let result = data::ScriptEntry {
             name,
-            path,
+            path: path.into(),
             required_features: table
                 .get("required-features")
                 .and_then(Item::as_array)
@@ -320,7 +343,7 @@ required-features = ["hi", "hi/there"]
         let doc = ManifestEditor::from_string(TOML).unwrap();
         let expected = Some(data::ScriptEntry {
             name: "my-script".to_owned(),
-            path: "src/my_script.rs".to_owned(),
+            path: "src/my_script.rs".into(),
             required_features: vec!["hi".to_owned(), "hi/there".to_owned()],
         });
 

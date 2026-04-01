@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::{fs, process};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use color_print::ceprintln;
 
 /// A rough attempt to print the subprocess invocations we're about to run.
@@ -42,12 +43,6 @@ pub fn show_invocation(cmd: &process::Command) {
     );
 }
 
-/// Canonicalize a name for matching purposes
-/// (i.e., 2 names "match" if they both canonicalize to the same string)
-pub fn canonicalize_crate_name(s: &str) -> String {
-    s.to_lowercase().replace('-', "_")
-}
-
 /// Why not built-in?
 pub fn join_str_iter<'a, 'b>(
     mut iter: impl Iterator<Item = &'a str>,
@@ -65,26 +60,80 @@ pub fn join_str_iter<'a, 'b>(
     result
 }
 
+// ───── String rectification ───────────────────────────────────── //
+
+/// Canonicalize a name for matching purposes
+/// (i.e., 2 names "match" if they both canonicalize to the same string)
+pub fn canonicalize_crate_name(s: &str) -> String {
+    s.to_lowercase().replace('-', "_")
+}
+
+/// Ensure that a requested filename for a script is of the form
+/// "src/[filename].rs"
+///
+/// It will correct for the following input issues:
+///  - if ".rs" is not present it will add it
+///  - the leading "src/" will be added if not present
+pub fn normalize_script_path(
+    input_path: &Utf8Path,
+) -> crate::Result<Utf8PathBuf> {
+    let num_components = input_path.components().count();
+
+    // strip leading "src/" if present
+    let filename: &str = {
+        if num_components == 1 {
+            Ok(input_path.as_str())
+        } else if num_components == 2
+            && input_path.components().next().unwrap().as_str() == "src"
+        {
+            Ok(input_path.file_name().unwrap())
+        } else {
+            Err(crate::Error::InvalidScriptFilename(input_path.to_owned()))
+        }?
+    };
+
+    // strip trailing ".rs" if present
+    let stem = filename.strip_suffix(".rs").unwrap_or(filename);
+
+    if !stem
+        .chars()
+        .all(|c| c.is_ascii_digit() || c.is_ascii_alphabetic() || c == '_')
+    {
+        return Err(crate::Error::InvalidScriptFilename(input_path.to_owned()));
+    }
+
+    Ok(Utf8Path::new("src").join(stem).with_extension(".rs"))
+}
+
 // ───── Wrappers around stdlib with our own error handling ─────── //
 // we can't just use a From trait for these because afaict io::Error doesn't provide
 // enough context to build a good error message (like, e.g., the name of the file)
 
-pub fn write_file(dest: &Path, content: &str) -> crate::Result<()> {
-    fs::write(dest, content).map_err(|ioerr| {
-        crate::ioerr!(ioerr, "Failed to write to {}", dest.to_string_lossy())
+/// rename a file, overwriting destination if it exists.
+///
+/// nb, there does not seem to a general purpose API that will prevent
+/// overwriting atomically by failing if the destination exists, as it's
+/// not available even on all posix systems.
+pub fn rename_file(src: &Utf8Path, dest: &Utf8Path) -> crate::Result<()> {
+    fs::rename(src, dest).map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Failed to rename '{src}' to '{dest}'")
     })
 }
 
-pub fn read_file(src: &Path) -> crate::Result<String> {
-    fs::read_to_string(src).map_err(|ioerr| {
-        crate::ioerr!(ioerr, "Failed to read '{}'", src.to_string_lossy(),)
-    })
+pub fn write_file(dest: &Utf8Path, content: &str) -> crate::Result<()> {
+    fs::write(dest, content)
+        .map_err(|ioerr| crate::ioerr!(ioerr, "Failed to write to {dest}"))
 }
 
-pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
+pub fn read_file(src: &Utf8Path) -> crate::Result<String> {
+    fs::read_to_string(src)
+        .map_err(|ioerr| crate::ioerr!(ioerr, "Failed to read '{src}'"))
+}
+
+pub fn copy_file(src: &Utf8Path, dest: &Utf8Path) -> crate::Result<()> {
     fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
-        src: src.display().to_string(),
-        dest: dest.display().to_string(),
+        src: src.to_owned(),
+        dest: dest.to_owned(),
         err: e.to_string(),
     })?;
 
@@ -103,13 +152,29 @@ pub fn run_subproc(
     })
 }
 
-pub fn create_dir(path: &Path) -> crate::Result<()> {
+pub fn create_dir(path: &Utf8Path) -> crate::Result<()> {
     fs::create_dir(path).map_err(|ioerr| {
-        crate::ioerr!(
-            ioerr,
-            "Failed to create directory at '{}'",
-            path.to_string_lossy()
-        )
+        crate::ioerr!(ioerr, "Failed to create directory at '{path}'",)
     })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_script_path() {
+        for (input, expected) in [
+            ("hi", "src/hi.rs"),
+            ("bye.rs", "src/bye.rs"),
+            ("src/sigh", "src/sigh.rs"),
+            ("src/die.rs", "src/die.rs"),
+        ] {
+            assert_eq!(
+                normalize_script_path(input.into()).unwrap(),
+                expected.to_owned()
+            );
+        }
+    }
 }

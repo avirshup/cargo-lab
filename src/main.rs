@@ -21,7 +21,6 @@ mod random_names;
 mod script_name_newtype;
 
 use std::io;
-use std::path::PathBuf;
 
 use color_print::ceprintln;
 
@@ -68,12 +67,9 @@ fn run(args: cli::MainCli) -> Result<()> {
             name: input_name,
             edition,
         }) => {
-            let path = PathBuf::from(path_str);
+            let path = path_str;
             let name: String = input_name.unwrap_or_else(|| {
-                path.file_name()
-                    .expect("non-empty filename")
-                    .to_string_lossy()
-                    .into()
+                path.file_name().expect("non-empty filename").into()
             });
 
             ops::init_new_playground(&path, &name, &edition, ctx)?;
@@ -115,6 +111,28 @@ fn run(args: cli::MainCli) -> Result<()> {
 
             let request = _build_script_request(script_name, inject_args)?;
             ops::new_script(&request, template.as_deref(), edit, ctx)?;
+        },
+
+        cli::SubCmd::RenameScript(cli::RenameScript {
+            script_name,
+            name,
+            path,
+            edit,
+        }) => {
+            if name.is_none() && path.is_none() {
+                return Err(Error::CliArgParseFail(
+                    "At least one of '--name' or '--path' must be specified"
+                        .to_owned(),
+                ));
+            }
+
+            ops::rename_script(
+                &script_name,
+                name.as_deref(),
+                path.as_deref(),
+                edit,
+                ctx,
+            )?;
         },
 
         cli::SubCmd::ListScripts => {
