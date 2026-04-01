@@ -1,6 +1,7 @@
+use all_the_errors::CollectAllTheErrors;
+
 use crate::data;
 use crate::errors::Error;
-use all_the_errors::CollectAllTheErrors;
 
 /// Figures out which "features" the user is requesting for the script
 /// Note that "feature" is confusing, as it includes dependencies themselves

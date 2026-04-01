@@ -1,12 +1,14 @@
+use std::path::PathBuf;
+
+use clap::builder::Styles;
+use clap::{Args, Parser, Subcommand};
+use clap_complete::Shell;
+
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
 };
 use super::{parsers, style};
 use crate::{build_passthrough_long_args, data};
-use clap::builder::Styles;
-use clap::{Args, Parser, Subcommand};
-use clap_complete::Shell;
-use std::path::PathBuf;
 
 /// Manage scripts and dependencies in a playground project
 #[derive(Debug, Parser)]
@@ -110,7 +112,8 @@ pub enum SubCmd {
         #[arg(
             short,
             long,
-            help = "Shell to generate autocompletions for (if not pased, attempt to detect current shell)"
+            help = "Shell to generate autocompletions for (if not pased, \
+                    attempt to detect current shell)"
         )]
         shell: Option<Shell>,
     },
