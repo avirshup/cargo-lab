@@ -3,21 +3,26 @@ use crate::data::{MISSING, ScriptEntry};
 use all_the_errors::CollectAllTheErrors;
 use std::fs;
 use std::path::Path;
-use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, Value};
+use toml_edit::{Array, ArrayOfTables, Item, Table, Value};
 
-pub struct CargoDotToml(DocumentMut);
+pub struct CargoDotToml(toml_edit::DocumentMut);
 
 impl CargoDotToml {
     // ───── Constructors ─────
     pub fn read(path: &Path) -> crate::Result<Self> {
-        let toml_content = fs::read_to_string(path)?;
-        let doc = toml_content.parse::<DocumentMut>()?;
+        let toml_content = fs::read_to_string(path).map_err(|ioerr| {
+            crate::Error::IoFail(
+                format!("Failed to read '{}'", path.to_string_lossy()),
+                ioerr,
+            )
+        })?;
+        let doc = toml_content.parse::<toml_edit::DocumentMut>()?;
         Ok(Self(doc))
     }
 
     #[allow(unused)] // for testing mostly
     pub fn from_string(content: &str) -> crate::Result<Self> {
-        let doc = content.parse::<DocumentMut>()?;
+        let doc = content.parse::<toml_edit::DocumentMut>()?;
         Ok(Self(doc))
     }
 
@@ -28,7 +33,12 @@ impl CargoDotToml {
     }
 
     pub fn write(&self, target: &Path) -> crate::Result<()> {
-        fs::write(target, self.0.to_string())?;
+        fs::write(target, self.0.to_string()).map_err(|ioerr| {
+            crate::Error::IoFail(
+                format!("Failed to write to {}", target.to_string_lossy()),
+                ioerr,
+            )
+        })?;
         Ok(())
     }
 
@@ -145,7 +155,7 @@ impl CargoDotToml {
 
         for feature_str in feature_strs {
             // This is N^2 ... but, um, how many features are you adding that this is an issue?
-            add_unique_string_to_array(feature_array, &feature_str);
+            _add_unique_string_to_array(feature_array, &feature_str);
         }
 
         Ok(())
@@ -153,10 +163,6 @@ impl CargoDotToml {
 
     // ───── internal helpers ───────────────────────────────────────── //
     fn normalize_dep_name(&self, input_name: &str) -> crate::Result<&str> {
-        fn _canonicalize_name(s: &str) -> String {
-            s.replace('-', "_")
-        }
-
         self.find_dep_name(input_name)
             .ok_or_else(|| crate::Error::DependencyNotFound((*input_name).to_owned()))
     }
@@ -165,9 +171,6 @@ impl CargoDotToml {
     /// To match `cargo` behavior, this is case- and
     /// undescore/hyphen-insensitive
     fn find_dep_name(&self, input_dep_name: &str) -> Option<&str> {
-        fn _canonicalize_name(s: &str) -> String {
-            s.replace('-', "_")
-        }
         let canonicalized_input = _canonicalize_name(input_dep_name);
         let dep_table = self.0.get("dependencies")?.as_table_like()?;
 
@@ -223,15 +226,14 @@ impl CargoDotToml {
     }
 }
 
-/// Canonicalize a package name the same way cargo does it for
-/// matching purposes. 2 names are equivalent if they both
-/// canonicalize to the same string.
+/// Canonicalize a name for matching purposes
+/// (i.e., 2 names "match" if they both canonicalize to the same string)
 fn _canonicalize_name(s: &str) -> String {
     s.to_lowercase().replace('-', "_")
 }
 
-fn add_unique_string_to_array(arr: &mut Array, s: &str) {
-    if !arr.iter().any(|item| item.as_str() == Some(s)) {
+fn _add_unique_string_to_array(arr: &mut Array, s: &str) {
+    if arr.iter().all(|item| item.as_str() != Some(s)) {
         arr.push(s);
     }
 }

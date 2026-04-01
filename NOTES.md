@@ -25,6 +25,23 @@ are _generated_, so they go in the _user's_ completions file. I think.
 ACTUALLY ACTUALLY ACTUALLY shouldn't it go in the same prefix as cargo?
 oh my god fuck it.
 
+### note on debugging completions
+
+If you install the completions into any of the completion directories, it appears
+that they will only be loaded when you run the executable when it's in your `$PATH`,
+not if you refere to it via a path. So it's probably easiest to `source` it when
+trying it out in dev.
+
+### Note on how well it actually works
+
+So, `clap_complete` is not quite as, well, feature-complete as I thought
+it would be?
+
+- does not retain order? (`-k` option)
+- stable has no support for custom completions - not even compile-time static ones
+- You can enable the dauntingly named `unstable-dynamic` crate feature, which
+  does provide more support for customization, [e.g.](https://docs.rs/clap_complete/latest/clap_complete/engine/struct.ArgValueCompleter.html).
+
 ## Not fish
 
 Aside from fish (which has apparently best-in-class documentation), I cannot

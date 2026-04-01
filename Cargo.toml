@@ -13,9 +13,11 @@ toml_edit = "0.25.8"
 
 # Trust: highest (as annotated)
 cfg-if = "1.0.4"  # owned by core rust org
-clap = { version = "4.6.0", features = ["derive", "wrap_help", "color"] }  # foundational
-clap_complete = "4.6.0"  # part of clap project
+clap = { version = "4.6.0", features = ["derive", "wrap_help", "color", "string"] }  # foundational
 thiserror = "2.0.18" # foundational
+
+# Trust: high (+part of clap project, -we're using unstable features)
+clap_complete = { version = "4.6.0", features = ["unstable-dynamic"] }
 
 ## Trust: high (used extensively, audited)
 #macro_rules_attribute = "0.2.2"
