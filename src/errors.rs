@@ -38,7 +38,8 @@ pub enum Error {
     DependencyNotFound(String),
 
     #[error(
-        "Feature '{0}' is ambiguous, please qualify with its dependency, i.e., 'depname/{0}'."
+        "Feature '{0}' is ambiguous, please qualify with its dependency, \
+         i.e., 'depname/{0}'."
     )]
     AmbiguousFeature(String),
 

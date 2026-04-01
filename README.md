@@ -205,3 +205,7 @@ Why I use this:
   especially if you want to have lots of different dependencies for all the different
   binaries.
     - This process is exactly what this crate automates.
+
+# Dev notes
+
+- Uses nightly rustfmt for latest and greatest formatting (`cargo +nightly fmt`)

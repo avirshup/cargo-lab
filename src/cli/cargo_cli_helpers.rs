@@ -1,10 +1,12 @@
 //! Tools for determining whether this was invoked as a cargo subcommand
 //! or not and then parsing argv accordingly
-use crate::cli;
-use clap::Parser;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
+
+use clap::Parser;
+
+use crate::cli;
 
 /// Was this invoked with an argv of `["cargo-$X", "$X", ..args]`
 /// or directly (with this exe as arg0?)

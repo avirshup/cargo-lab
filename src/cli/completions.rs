@@ -1,16 +1,17 @@
-use super::cargo_cli_helpers::InvocationType;
-use crate::cli;
-use crate::config;
-use crate::config::Config;
-use crate::manifest_editor::CargoDotToml;
+use std::ffi::{OsStr, OsString};
+use std::io;
+use std::path::Path;
+
 use clap::CommandFactory;
 use clap_complete::{
     ArgValueCandidates, ArgValueCompleter, CompletionCandidate, PathCompleter,
     Shell, generate,
 };
-use std::ffi::{OsStr, OsString};
-use std::io;
-use std::path::Path;
+
+use super::cargo_cli_helpers::InvocationType;
+use crate::config::Config;
+use crate::manifest_editor::CargoDotToml;
+use crate::{cli, config};
 
 // ───── Dynamic completions ────────────────────────────────────── //
 pub fn manifest_path_completer() -> ArgValueCompleter {

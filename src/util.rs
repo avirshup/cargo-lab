@@ -1,6 +1,7 @@
-use color_print::ceprintln;
 use std::path::Path;
 use std::{fs, process};
+
+use color_print::ceprintln;
 
 pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
     fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
@@ -12,9 +13,14 @@ pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
     Ok(())
 }
 
-pub fn run_subproc(mut cmd: process::Command) -> crate::Result<process::ExitStatus> {
+pub fn run_subproc(
+    mut cmd: process::Command,
+) -> crate::Result<process::ExitStatus> {
     let mut child = cmd.spawn().map_err(|ioerr| {
-        crate::Error::IoFail(format!("Failed to spawn process '{cmd:?}'"), ioerr)
+        crate::Error::IoFail(
+            format!("Failed to spawn process '{cmd:?}'"),
+            ioerr,
+        )
     })?;
 
     child.wait().map_err(|ioerr| {

@@ -1,11 +1,12 @@
-use crate::cli::CargoAddArgs;
-use crate::manifest_editor::CargoDotToml;
-use crate::util;
-use crate::{config, data};
-use color_print::{ceprintln, cprintln};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process;
+
+use color_print::{ceprintln, cprintln};
+
+use crate::cli::CargoAddArgs;
+use crate::manifest_editor::CargoDotToml;
+use crate::{config, data, util};
 // /// Attempt to open a dependency's manifest in a browser.
 // ///
 // ///
@@ -185,7 +186,8 @@ pub fn inject_deps(
         let cargo_add_result = util::run_subproc(cmd)?;
         if !cargo_add_result.success() {
             return Err(crate::Error::CargoFail(format!(
-                "`cargo add` command reported failure (status:  {cargo_add_result})"
+                "`cargo add` command reported failure (status:  \
+                 {cargo_add_result})"
             )));
         }
     }

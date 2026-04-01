@@ -1,10 +1,12 @@
-use crate::data;
-pub use Verbosity::*;
-use cfg_if::cfg_if;
 use std::env;
 use std::env::current_dir;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+
+pub use Verbosity::*;
+use cfg_if::cfg_if;
+
+use crate::data;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Verbosity {

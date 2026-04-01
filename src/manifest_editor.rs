@@ -1,9 +1,11 @@
-use crate::data;
-use crate::data::{MISSING, ScriptEntry};
-use all_the_errors::CollectAllTheErrors;
 use std::fs;
 use std::path::Path;
+
+use all_the_errors::CollectAllTheErrors;
 use toml_edit::{Array, ArrayOfTables, Item, Table, Value};
+
+use crate::data;
+use crate::data::{MISSING, ScriptEntry};
 
 pub struct CargoDotToml(toml_edit::DocumentMut);
 
@@ -50,7 +52,9 @@ impl CargoDotToml {
             .find(|entry| _canonicalize_name(entry.name) == canon_name)
     }
 
-    pub fn list_scripts(&self) -> Option<impl Iterator<Item = ScriptEntry<'_>>> {
+    pub fn list_scripts(
+        &self,
+    ) -> Option<impl Iterator<Item = ScriptEntry<'_>>> {
         self.0
             .get("bin")?
             .as_array_of_tables()
@@ -58,7 +62,11 @@ impl CargoDotToml {
     }
 
     // ───── Mutators ─────
-    pub fn add_new_bin(&mut self, bin_name: &str, src_path: &str) -> crate::Result<()> {
+    pub fn add_new_bin(
+        &mut self,
+        bin_name: &str,
+        src_path: &str,
+    ) -> crate::Result<()> {
         // ───── Part 1: insert bin array ───────────────────────────────── //
         // get or create top-level `[[bin]]` array
         let bin_array = self.0["bin"]
@@ -66,7 +74,8 @@ impl CargoDotToml {
             .as_array_of_tables_mut()
             .ok_or_else(|| {
                 crate::Error::ManifestCorrupt(
-                    "'[[bin]]' key exists but is not an array of tables".to_string(),
+                    "'[[bin]]' key exists but is not an array of tables"
+                        .to_string(),
                 )
             })?;
 
@@ -125,14 +134,15 @@ impl CargoDotToml {
         feature_requests: &[data::FeatureRequest],
     ) -> crate::Result<()> {
         // ───── Part 1: figure out what we're adding ─────
-        let dep_strs = dep_requests
-            .iter()
-            .map(|dep| self.normalize_dep_name(&dep.depname).map(str::to_owned));
-
-        let feature_activation_strs = feature_requests.iter().map(|feature_req| {
-            self.normalize_dep_name(&feature_req.depname)
-                .map(|dep| format!("{}/{}", dep, feature_req.featurename))
+        let dep_strs = dep_requests.iter().map(|dep| {
+            self.normalize_dep_name(&dep.depname).map(str::to_owned)
         });
+
+        let feature_activation_strs =
+            feature_requests.iter().map(|feature_req| {
+                self.normalize_dep_name(&feature_req.depname)
+                    .map(|dep| format!("{}/{}", dep, feature_req.featurename))
+            });
 
         let feature_strs: Vec<String> = dep_strs
             .chain(feature_activation_strs)
@@ -140,16 +150,19 @@ impl CargoDotToml {
             .map_err(crate::Error::from_nonempty_iter)?;
 
         // ───── part 2: add it ─────
-        let bin_entry = self
-            .get_bin_entry_mut(input_script_name)
-            .ok_or_else(|| crate::Error::ScriptNotFound(input_script_name.to_owned()))?;
+        let bin_entry =
+            self.get_bin_entry_mut(input_script_name).ok_or_else(|| {
+                crate::Error::ScriptNotFound(input_script_name.to_owned())
+            })?;
 
         let feature_array = bin_entry["required-features"]
             .or_insert(Array::new().into())
             .as_array_mut()
             .ok_or_else(|| {
                 crate::Error::ManifestCorrupt(
-                    "'required-features' for script 'input_bin_name' is not an array".to_owned(),
+                    "'required-features' for script 'input_bin_name' is not \
+                     an array"
+                        .to_owned(),
                 )
             })?;
 
@@ -163,8 +176,9 @@ impl CargoDotToml {
 
     // ───── internal helpers ───────────────────────────────────────── //
     fn normalize_dep_name(&self, input_name: &str) -> crate::Result<&str> {
-        self.find_dep_name(input_name)
-            .ok_or_else(|| crate::Error::DependencyNotFound((*input_name).to_owned()))
+        self.find_dep_name(input_name).ok_or_else(|| {
+            crate::Error::DependencyNotFound((*input_name).to_owned())
+        })
     }
 
     /// Find a script matching the input name.

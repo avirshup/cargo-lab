@@ -6,10 +6,12 @@ mod errors;
 mod manifest_editor;
 mod util;
 
-use crate::errors::{Error, Result};
+use std::io;
+
 use clap_complete::Shell;
 use config::Config;
-use std::io;
+
+use crate::errors::{Error, Result};
 
 fn main() -> Result<()> {
     // note that this won't return if `$COMPLETE` env var is set
@@ -106,12 +108,14 @@ fn run(args: cli::PlaygroundCli, cfg: Config) -> Result<()> {
         },
 
         cli::SubCmd::InstallCompletions { shell } => {
-            let requested_shell = shell.or_else(Shell::from_env).ok_or_else(|| {
-                Error::InputErr(
-                    "Could not automatically determine your shell; please specify it with '--shell'"
-                        .to_owned()
-                )
-            })?;
+            let requested_shell =
+                shell.or_else(Shell::from_env).ok_or_else(|| {
+                    Error::InputErr(
+                        "Could not automatically determine your shell; please \
+                         specify it with '--shell'"
+                            .to_owned(),
+                    )
+                })?;
 
             cli::write_completion_script(requested_shell, io::stdout())?;
         },
