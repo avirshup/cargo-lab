@@ -51,7 +51,7 @@
           scripts (leads to confusing usage messages). **alternative 3**: use a
           different command (`cpg quick`?) to make it explicit.
     - [x] `cpg quick`
-    - [ ] `cpg rename`
+    - [x] `cpg rename`
 - [x] "play with a crate" workflow
     - [x] ~~`cpg play-with $depname`~~
       `cpg quick [dupname]` creates new automatically named script
@@ -59,9 +59,12 @@
       know the crate name)
     - [x] ~~opens API docs in browser?~~ nah
 - [ ] finish splitting this into its own repo
-- [ ] Alfred workflow W/ same autocomplete support as terminal (for me anyway)
+- [ ] lifecycle test
+    - init a repo, add templates, create scripts, add dependencies, run scripts
 
 ## Functionality
+
+- [ ] Alfred workflow W/ same autocomplete support as terminal (for me anyway)
 
 ### Bugs
 
