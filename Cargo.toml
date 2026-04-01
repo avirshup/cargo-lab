@@ -3,37 +3,25 @@ name = "cargo-lab"
 version = "0.0.0-unset"
 edition = "2024"
 
+[features]
+xtask = []  # for use as an "xtask" in a subfolder of the project root
+experimental_cargo_script_rfc3502 = ["dep:winnow"]
+
 [dependencies]
-# Trust: highest (same deps as cargo itself)
+all-the-errors = "0.1.1" # my crate
+
+# Trust: highest (all are deps of cargo itself except where noted)
 anstream = "1.0.0"
 anstyle = "1.0.14"
 annotate-snippets = "0.12.13"
-color-print = "0.3.7"
-toml_edit = "0.25.8"
-
-# Trust: highest (as annotated)
 cfg-if = "1.0.4"  # owned by core rust org
-clap = { version = "4.6.0", features = ["derive", "wrap_help", "color", "string"] }  # foundational
-thiserror = "2.0.18" # foundational
-
-# Trust: high (+part of clap project, -we're using unstable features)
+clap = { version = "4.6.0", features = ["derive", "wrap_help", "color", "string"] }
 clap_complete = { version = "4.6.0", features = ["unstable-dynamic"] }
+color-print = "0.3.7"
+toml_edit = { version = "0.25.11", features = ["serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.18"
+winnow = { version = "1.0.1", optional = true }
 
-## Trust: high (used extensively, audited)
-#macro_rules_attribute = "0.2.2"
-
-# My own crate
-all-the-errors = "0.1.1"
-
-
-#[dependencies.cargo_metadata] # Trust: high
-## + recommended by "the cargo book"
-## + known author
-## + well audited: https://lib.rs/crates/cargo_metadata/audit
-## - not as highly used as the others
-#version = "0.23.1"
-## Do we need this? Seems like a lot of overhead
-## just to validate feature names.
-
-[features]
-xtask = []  # for use as an "xtask" in a subfolder of the project root
+# Trust: high (widely used)
+macro_rules_attribute = "0.2.2"

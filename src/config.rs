@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::env;
 use std::env::current_dir;
 use std::ffi::OsStr;
@@ -5,35 +6,123 @@ use std::path::{Path, PathBuf};
 
 pub use Verbosity::*;
 use cfg_if::cfg_if;
+use serde::Deserialize;
 
-use crate::data;
+use crate::manifest_data::{ManifestData, PlaygroundConfig};
+use crate::manifest_editor::ManifestEditor;
+use crate::{data, util};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Verbosity {
-    Quiet,
-    Normal,
-    Verbose,
-    Debug,
+type CachedResult<'a, T> = Result<T, &'a crate::Error>;
+
+/// Loads configuration values as needed for a given operation.
+///
+/// This is all done lazily since different operations have
+/// different configuration needs (e.g., the "init"
+/// command does not even need a manifest,
+/// but the `run` command needs a fully configured manifest).
+pub struct GlobalCtx {
+    pub verbosity: Verbosity,
+    pub cwd: PathBuf,
+    pub cargo_exe: PathBuf,
+
+    _project_paths: OnceCell<crate::Result<ProjectPaths>>,
+    _manifest_raw: OnceCell<crate::Result<String>>,
+    _manifest_data: OnceCell<crate::Result<ManifestData>>,
+    _playground_config: OnceCell<Option<PlaygroundConfig>>,
+    // NB: editable manifest TOML does not belong here because it's mutable
+}
+
+impl GlobalCtx {
+    pub fn from_env(verbosity: Verbosity) -> crate::Result<Self> {
+        let cwd = current_dir()
+            .map_err(|ioerr| crate::ioerr!(ioerr, "Failed to determine CWD"))?;
+
+        let cargo_exe =
+            PathBuf::from(env::var("CARGO").unwrap_or("cargo".to_owned()));
+
+        Ok(Self {
+            verbosity,
+            cwd,
+            cargo_exe,
+            _project_paths: Default::default(),
+            _manifest_raw: Default::default(),
+            _manifest_data: Default::default(),
+            _playground_config: Default::default(),
+        })
+    }
+
+    /// Create a new context to re-read the manifest after, e.g., it's changed on disk.
+    ///
+    /// Note this is still lazy so it doesn't actually re-read the manifest from disk
+    /// until requested.
+    pub fn reload(&self) -> GlobalCtx {
+        Self {
+            verbosity: self.verbosity,
+            cwd: self.cwd.clone(),
+            cargo_exe: self.cargo_exe.clone(),
+            _project_paths: Default::default(),
+            _manifest_raw: Default::default(),
+            _manifest_data: Default::default(),
+            _playground_config: Default::default(),
+        }
+    }
+
+    pub fn manifest_raw(&'_ self) -> CachedResult<'_, &String> {
+        self._manifest_raw
+            .get_or_init(|| {
+                self.project_paths()
+                    .map_err(Clone::clone)
+                    .and_then(|paths| util::read_file(&paths.cargo_dot_toml))
+            })
+            .as_ref()
+    }
+
+    pub fn project_paths(&'_ self) -> CachedResult<'_, &ProjectPaths> {
+        self._project_paths
+            .get_or_init(|| ProjectPaths::discover(&self.cwd))
+            .as_ref()
+    }
+
+    pub fn manifest_data(&'_ self) -> CachedResult<'_, &ManifestData> {
+        self._manifest_data
+            .get_or_init(|| {
+                self.manifest_raw().map_err(Clone::clone).and_then(|s| {
+                    let de = toml_edit::de::Deserializer::parse(s)?;
+                    let data = ManifestData::deserialize(de)?;
+                    Ok(data)
+                })
+            })
+            .as_ref()
+    }
+
+    pub fn playground_config(&self) -> &Option<PlaygroundConfig> {
+        self._playground_config.get_or_init(|| {
+            self.manifest_data()
+                .as_ref()
+                .ok()
+                .and_then(|x| x.playground_config().map(|x| x.clone()))
+        })
+    }
+
+    /// Return a _fresh_ editable copy of the manifest from its original
+    /// state. Unlike most of the other methods here, this is *not* cached
+    /// (it constructs a new editor every time it is called).
+    pub fn new_editor(&self) -> crate::Result<ManifestEditor> {
+        self.manifest_raw()
+            .map_err(Clone::clone)
+            .and_then(|s| ManifestEditor::from_string(s))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Config {
-    pub cwd: PathBuf,
+pub struct ProjectPaths {
     pub manifest_dir: PathBuf,
-    pub template_dir: PathBuf, // TODO: make this optional probably?
+    pub template_dir: PathBuf,
     pub cargo_dot_toml: PathBuf,
-    pub cargo_exe: PathBuf,
-    pub verbosity: Verbosity,
 }
 
-impl Config {
-    // TODO: this needs to be split up into fallible parts (project paths
-    //   which may not exist) and infallible parts (verbosity)
-    pub fn from_env(verbosity: Verbosity) -> crate::Result<Self> {
-        let cwd = current_dir().map_err(|ioerr| {
-            crate::Error::IoFail("Failed to determine CWD".to_owned(), ioerr)
-        })?;
-
+impl ProjectPaths {
+    pub fn discover(cwd: &Path) -> crate::Result<Self> {
         cfg_if! {
             if #[cfg(feature = "xtask")] {
                 let xtask_project_path = PathBuf::from(
@@ -56,21 +145,13 @@ impl Config {
             }
         }
 
-        // should be set by cargo, but can just default to `cargo`
-        // TODO: would it be "cargo.exe" on windows??
-        let cargo_exe =
-            PathBuf::from(env::var("CARGO").unwrap_or("cargo".to_owned()));
-
         // FIXMEFIXME: this will not work unless xtask
 
         let cargo_dot_toml = manifest_dir.join("Cargo.toml");
         Ok(Self {
-            cwd,
             manifest_dir,
             template_dir,
-            cargo_exe,
             cargo_dot_toml,
-            verbosity,
         })
     }
 
@@ -95,12 +176,10 @@ impl Config {
         &self,
     ) -> crate::Result<impl Iterator<Item = data::ScriptTemplate>> {
         let dir_reader = self.template_dir.read_dir().map_err(|ioerr| {
-            crate::Error::IoFail(
-                format!(
-                    "Could not access template dir: {}",
-                    self.template_dir.to_string_lossy()
-                ),
+            crate::ioerr!(
                 ioerr,
+                "Could not access template dir: {}",
+                self.template_dir.to_string_lossy()
             )
         })?;
 
@@ -129,6 +208,25 @@ impl Config {
             }))
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Verbosity {
+    Quiet,
+    Normal,
+    Verbose,
+    Debug,
+}
+
+//
+// #[derive(Clone, Debug, PartialEq, Eq)]
+// pub struct Config {
+//     pub cwd: PathBuf,
+//     pub manifest_dir: PathBuf,
+//     pub template_dir: PathBuf,
+//     pub cargo_dot_toml: PathBuf,
+//     pub cargo_exe: PathBuf,
+//     pub verbosity: Verbosity,
+// }
 
 // tbh in valid cases it should not be more than 1 or _maybe_ 2 levels up
 #[allow(dead_code)]

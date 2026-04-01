@@ -192,7 +192,7 @@ Why I use this:
       which is great.
 
 
-- single file [cargo scripts](https://rust-lang.github.io/rfcs/3424-cargo-script.html) are also a great idea, but don't yet have IDE
+- single file [cargo scripts](https://rust-lang.github.io/rfcs/3502-cargo-script.html) are also a great idea, but don't yet have IDE
   support. For my playground experiments specifically, I also kind of like having
   a single `Cargo.toml` for everything.
 

@@ -1,22 +1,30 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum Error {
     #[error("TOML parsing error: {0}")]
     ParseErr(#[from] toml_edit::TomlError),
 
-    // TODO: This does not actually produce helpful errors
-    #[error("IO operation error: {0} ({1})")]
-    IoFail(String, std::io::Error),
+    #[error("IO operation error: {desc} ({err})")]
+    IoFail { desc: String, err: String },
+
+    #[cfg(feature = "experimental_cargo_script_rfc3502")]
+    #[error("RFC 3502 parsing error: {0}")]
+    EmbeddedScriptErr(
+        #[from] crate::vendor_cargo::frontmatter::FrontmatterError,
+    ),
 
     #[error("Required env var missing: {0}")]
     EnvVarMissing(String),
+
+    #[error("TOML parsing error: {0}")]
+    TomlParsingFailed(#[from] toml_edit::de::Error),
 
     #[error("Failed to copy {src} to {dest}: {err}")]
     CopyFailed {
         src: String,
         dest: String,
-        err: std::io::Error,
+        err: String,
     },
 
     #[error("Config discovery failed: {0}")]
@@ -33,6 +41,9 @@ pub enum Error {
 
     #[error("No script matching '{0}' found in Cargo.toml")]
     ScriptNotFound(String),
+
+    #[error("Script named '{0}' already exists in Cargo.toml")]
+    ScriptNameConflict(String),
 
     #[error("No dependency matching '{0}' found in Cargo.toml")]
     DependencyNotFound(String),
@@ -67,4 +78,33 @@ impl Error {
             first_err
         }
     }
+
+    pub fn from_serde_err(err: impl serde::de::Error) -> Self {
+        Self::ManifestCorrupt(err.to_string())
+    }
+}
+
+/// Lets us apply `?` to borrowed errors (which we get from cached results)
+///
+/// Implementing `From` for references via cloning seems like a weird idea
+/// in general, really it would be nice to implement this via the (currently
+/// experimental) [`Try`] trait instead?
+impl From<&Error> for Error {
+    fn from(err: &Error) -> Self {
+        err.clone()
+    }
+}
+
+/// These are kind of annoying to handle, so just putting them in
+/// a macro for now to maintain flexibility ...
+///
+/// Usage: `ioerr!( IOERR, *args_for_format!)`
+#[macro_export]
+macro_rules! ioerr {
+    ( $err:ident, $($arg:tt)+ ) => {
+        $crate::Error::IoFail{
+            err: $err.to_string(),
+            desc: format!( $($arg)+ )
+        }
+    };
 }

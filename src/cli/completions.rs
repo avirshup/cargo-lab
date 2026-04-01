@@ -1,4 +1,4 @@
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 
@@ -8,9 +8,8 @@ use clap_complete::{
     Shell, generate,
 };
 
-use super::cargo_cli_helpers::InvocationType;
-use crate::config::Config;
-use crate::manifest_editor::CargoDotToml;
+use super::cargo_subcmd_shim::{InvocationType, build_cli_command};
+use crate::config::GlobalCtx;
 use crate::{cli, config};
 
 // ───── Dynamic completions ────────────────────────────────────── //
@@ -22,16 +21,21 @@ pub fn manifest_path_completer() -> ArgValueCompleter {
 
 pub fn script_name_completer() -> ArgValueCandidates {
     ArgValueCandidates::new(|| {
-        // TODO: partially parse the current argv (the args after '--')
+        // TODO: partially parse the current argv
+        //   (in dynamic completion mode this will be args after '--')
         //   to see if `--manifest-path` has been passed
-        if let Ok(cfg) = Config::from_env(config::Quiet)
-            && let Ok(manifest) = CargoDotToml::read(&cfg.cargo_dot_toml)
-            && let Some(script_iter) = manifest.list_scripts()
+
+        if let Ok(ctx) = GlobalCtx::from_env(config::Quiet)
+            && let Ok(manifest) = ctx.manifest_data()
         {
-            script_iter
+            manifest
+                .iter_script_entries()
                 .map(|script| {
                     CompletionCandidate::new(script.name)
                         .help(Some(script.path.to_string().into()))
+                    // TODO: add .display_order() based on most recenty used?
+                    //     Or based on creation order (would be reverse of order
+                    //    from cargo.toml if it hasn't been modified?
                 })
                 .collect()
         } else {
@@ -42,8 +46,9 @@ pub fn script_name_completer() -> ArgValueCandidates {
 
 pub fn template_name_completer() -> ArgValueCandidates {
     ArgValueCandidates::new(|| {
-        if let Ok(cfg) = Config::from_env(config::Quiet)
-            && let Ok(template_iter) = cfg.iter_templates()
+        if let Ok(ctx) = GlobalCtx::from_env(config::Quiet)
+            && let Ok(paths) = ctx.project_paths()
+            && let Ok(template_iter) = paths.iter_templates()
         {
             template_iter
                 .map(|template| CompletionCandidate::new(template.name))
@@ -74,8 +79,7 @@ pub fn template_name_completer() -> ArgValueCandidates {
 /// - The above dynamic completion script includes instructions for the shell
 ///   to callback with various arguments in order to generate argument lists.
 pub fn maybe_exec_dynamic_automcomplete() {
-    clap_complete::CompleteEnv::with_factory(cli::PlaygroundCli::command)
-        .complete();
+    clap_complete::CompleteEnv::with_factory(build_cli_command).complete();
 }
 
 /// Print the completion script for the requested shell to stdout
@@ -88,14 +92,13 @@ pub fn write_completion_script<Stream>(
 where
     Stream: io::Write,
 {
-    let arg_vec: Vec<OsString> = std::env::args_os().collect();
-    let invocation_type = InvocationType::from_argv(&arg_vec);
+    let invocation_type = InvocationType::from_env();
 
     // the completions we generate depend upon exactly how this is invoked
     let mut cmd = match invocation_type {
         InvocationType::CargoSubcmd(_cargo_path, subcmd_name) => {
             clap::Command::new("cargo").subcommand(
-                cli::PlaygroundCli::command() //
+                cli::MainCli::command() //
                     .name(
                         subcmd_name //
                             .into_string()
@@ -104,7 +107,7 @@ where
             )
         },
         InvocationType::Direct(bin_path) => {
-            cli::PlaygroundCli::command() //
+            cli::MainCli::command() //
                 .name(
                     bin_path
                         .file_name()

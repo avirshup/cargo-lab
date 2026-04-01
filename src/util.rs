@@ -3,11 +3,17 @@ use std::{fs, process};
 
 use color_print::ceprintln;
 
+pub fn read_file(src: &Path) -> crate::Result<String> {
+    fs::read_to_string(src).map_err(|ioerr| {
+        crate::ioerr!(ioerr, "Failed to read '{}'", src.to_string_lossy(),)
+    })
+}
+
 pub fn copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
     fs::copy(src, dest).map_err(|e| crate::Error::CopyFailed {
         src: src.display().to_string(),
         dest: dest.display().to_string(),
-        err: e,
+        err: e.to_string(),
     })?;
 
     Ok(())
@@ -17,17 +23,11 @@ pub fn run_subproc(
     mut cmd: process::Command,
 ) -> crate::Result<process::ExitStatus> {
     let mut child = cmd.spawn().map_err(|ioerr| {
-        crate::Error::IoFail(
-            format!("Failed to spawn process '{cmd:?}'"),
-            ioerr,
-        )
+        crate::ioerr!(ioerr, "Failed to spawn process '{cmd:?}'")
     })?;
 
     child.wait().map_err(|ioerr| {
-        crate::Error::IoFail(
-            format!("Wait failed for '{cmd:?}' (pid={})", child.id()),
-            ioerr,
-        )
+        crate::ioerr!(ioerr, "Wait failed for '{cmd:?}' (pid={})", child.id())
     })
 }
 
@@ -68,4 +68,10 @@ pub fn show_invocation(cmd: &process::Command) {
         cmd_name,
         arg_display
     );
+}
+
+/// Canonicalize a name for matching purposes
+/// (i.e., 2 names "match" if they both canonicalize to the same string)
+pub fn canonicalize_crate_name(s: &str) -> String {
+    s.to_lowercase().replace('-', "_")
 }

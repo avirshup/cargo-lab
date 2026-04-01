@@ -1,3 +1,8 @@
+/// Something that can generate some arguments for another program
+pub trait GeneratesArgs {
+    fn cli_args(&self) -> Vec<String>;
+}
+
 /// Generate a struct named "--arg=value" style arguments
 /// (at compile time) that can be passed through to another
 /// program's CLI via its `cli_args` method.
@@ -65,8 +70,8 @@ macro_rules! build_passthrough_long_args {
             )*
         }
 
-        impl $struct_name {
-            $vis fn cli_args(&self) -> Vec<String> {
+        impl GeneratesArgs for $struct_name {
+            fn cli_args(&self) -> Vec<String> {
                 let mut vec = Vec::new();
 
                 $(
