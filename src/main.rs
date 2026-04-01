@@ -4,68 +4,57 @@ mod data;
 mod errors;
 mod manifest_editor;
 
+use all_the_errors::CollectAllTheErrors;
+
 use crate::cli::{ArgParser, SubCmd};
 use crate::errors::{Error, Result};
 use clap::Parser;
-use std::path::{Path, PathBuf};
+use data::ProjectPaths;
 
 fn main() -> Result<()> {
     let args = ArgParser::parse();
     let paths = ProjectPaths::from_env();
 
     match args.cmd {
+        SubCmd::RunScript { bin_name, args } => {
+            commands::run_script(&bin_name, &args, &paths)?;
+        }
         SubCmd::NewScript { bin_name, template } => {
             commands::new_script(&bin_name, &template, &paths)?;
         }
         SubCmd::ListScripts { quiet } => {
             commands::list_scripts(quiet, &paths)?;
         }
-        SubCmd::InjectDep {
+        SubCmd::InjectDeps {
             bin_name,
-            dep_name,
-            dep_features,
+            deps: input_deps,
+            features: mut input_features,
+            cargo_add_args,
         } => {
-            commands::inject_deps(&bin_name, &dep_name, &dep_features, &paths)?;
+            // ───── Extra parsing for features ─────────────────────────────── //
+
+            // insert implicit feature dependency qualifiers
+            // i.e., `inject depname -F feature` => `inject depname -F depname/feature`
+            // but only if there is exactly one dependency listed
+            if input_deps.len() == 1 {
+                let implicit_depname = &input_deps.first().unwrap().depname;
+                for input_feat in &mut input_features {
+                    if input_feat.dep_qualifier.is_none() {
+                        input_feat.dep_qualifier = Some(implicit_depname.to_owned());
+                    }
+                }
+            }
+
+            // ensure all requested features have a dependency
+            let features: Vec<data::FeatureRequest> = input_features
+                .into_iter()
+                .map(cli::FeatureCliArg::to_feature_req)
+                .collect_oks_or_iter_errs()
+                .map_err(Error::from_nonempty_iter)?;
+
+            commands::inject_deps(&bin_name, &input_deps, &features, &paths, &cargo_add_args)?;
         }
     };
 
     Ok(())
-}
-
-// ───── Project tree helper ────────────────────────────────────── //
-pub struct ProjectPaths {
-    pub manifest_dir: PathBuf,
-    pub template_dir: PathBuf,
-    pub cargo_dot_toml: PathBuf,
-    pub script_dir: PathBuf,
-}
-
-impl ProjectPaths {
-    pub fn from_env() -> Self {
-        let manifest_dir = Path::new(&env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let template_dir = manifest_dir.join("xtask/templates");
-        let cargo_dot_toml = manifest_dir.join("Cargo.toml");
-        let script_dir = manifest_dir.join("src");
-        Self {
-            manifest_dir,
-            template_dir,
-            script_dir,
-            cargo_dot_toml,
-        }
-    }
-
-    pub fn template_path(&self, name: &str) -> PathBuf {
-        self.template_dir.join(format!("{name}.rs.template"))
-    }
-
-    pub fn relative_to_root<'a>(&'_ self, path: &'a Path) -> &'a Path {
-        path.strip_prefix(self.manifest_dir.clone()).unwrap_or(path)
-    }
-
-    pub fn humanize<'a>(&'_ self, path: &'a Path) -> std::path::Display<'a> {
-        self.relative_to_root(path).display()
-    }
 }

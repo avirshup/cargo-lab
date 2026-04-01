@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.0", features = ["derive", "wrap_help"] }
+all-the-errors = "0.1.1"
 toml_edit = "0.25.8"
 thiserror = "2.0.18"
 

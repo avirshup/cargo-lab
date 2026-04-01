@@ -1,7 +1,9 @@
+use crate::data;
 use crate::data::{MISSING, ScriptEntry};
+use all_the_errors::CollectAllTheErrors;
 use std::fs;
 use std::path::Path;
-use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table};
+use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, Value};
 
 pub struct CargoDotToml(DocumentMut);
 
@@ -31,19 +33,22 @@ impl CargoDotToml {
     }
 
     // ───── Queries ─────
+    pub fn get_script(&self, input_name: &str) -> Option<ScriptEntry<'_>> {
+        let canon_name = _canonicalize_name(input_name);
+
+        self.list_scripts()?
+            .find(|entry| _canonicalize_name(entry.name) == canon_name)
+    }
+
     pub fn list_scripts(&self) -> Option<impl Iterator<Item = ScriptEntry<'_>>> {
-        self.0.get("bin")?.as_array_of_tables().map(|arr| {
-            arr.iter().map(|table| ScriptEntry {
-                name: table.get("name").and_then(Item::as_str).unwrap_or(MISSING),
-                path: table.get("path").and_then(Item::as_str).unwrap_or(MISSING),
-            })
-        })
+        self.0
+            .get("bin")?
+            .as_array_of_tables()
+            .map(|arr| arr.iter().map(Self::table_to_script_entry))
     }
 
     // ───── Mutators ─────
     pub fn add_new_bin(&mut self, bin_name: &str, src_path: &str) -> crate::Result<()> {
-        let feature_name = bin_feature_name(bin_name);
-
         // ───── Part 1: insert bin array ───────────────────────────────── //
         // get or create top-level `[[bin]]` array
         let bin_array = self.0["bin"]
@@ -70,94 +75,97 @@ impl CargoDotToml {
             let mut bin_table = Table::new();
             bin_table["name"] = bin_name.into();
             bin_table["path"] = src_path.into();
-
-            let mut required_features = Array::new();
-            required_features.push(feature_name);
-            bin_table["required-features"] = required_features.into();
+            bin_table["required-features"] = Array::new().into();
 
             bin_table
         };
 
         bin_array.push(bin_table);
 
-        // ───── Part 2: create a feature for it ────────────────────────── //
-        // this also needs a mutable borrow, so it can't happen simultaneously
-        // as the bin_array part
-
-        // get or create the top-level feature table
-        let feature_name = bin_feature_name(bin_name);
-        let feature_table = self.0["features"]
-            .or_insert(Table::new().into())
-            .as_table_mut()
-            .ok_or_else(|| {
-                crate::Error::ManifestCorrupt("'feature' key exists but is not a table".to_string())
-            })?;
-
-        // insert new array into the table
-        feature_table[&feature_name].or_insert(Array::new().into());
-
         Ok(())
     }
 
-    /// Add a dependency and its features to a script's feature list.
-    /// Does not insert duplicates entries in the array.
-    /// Will fail if the dependency or script does not exist.
+    /// Activate denpency features for a script with `required-features`.
+    /// Will fail if the dependencies or script does not exist.
     ///
     /// ## Example
     /// For instance, calling
-    /// `manifest.add_dep_to_feature("myscript", "thiserror", &["some_feature"])`
+    /// `manifest.add_dep_to_feature("myscript", &[DepFeature{pkg: "mypkg", feature: "myfeature")])`
     /// would change this:
     /// ```toml
-    /// [features]
-    /// myscript_deps = ["dep:foo"]
+    /// [[bin]]
+    /// name = "myscript"
+    /// path = "src/myscript.rs"
+    /// required-features = []
     /// ```
     /// into this:
     /// ```toml
-    /// [features]
-    /// myscript_deps = ["dep:foo", "dep:thiserror", "thiserror/some_feature"]
+    /// # [...]
+    /// required-features = ["mypkg/myfeature"]
     /// ```
-    pub fn add_dep_to_feature(
+    ///
+    /// ## Notes
+    /// You actually don't have to activate a dependency if you've
+    /// activated one of its features - e.g., you don't have to list
+    /// `dep:syn` if you've already listed `syn/parsing`.
+    pub fn activate_features(
         &mut self,
-        input_bin_name: &str,
-        input_depname: &str,
-        dep_features: &[String],
+        input_script_name: &str,
+        dep_requests: &[data::DepRequest],
+        feature_requests: &[data::FeatureRequest],
     ) -> crate::Result<()> {
-        // ───── Find the real names ───────────────────────────────────────────────── //
-        // (these need to be cloned so we don't have a shared borrow
-        // in the edit phase below)
-        let bin_name = self
-            .find_bin_name(input_bin_name)
-            .ok_or_else(|| crate::Error::ScriptNotFound(input_bin_name.to_owned()))?
-            .to_owned();
-        let depname = self
-            .find_dep_name(input_depname)
-            .ok_or_else(|| crate::Error::DependencyNotFound(input_depname.to_owned()))?
-            .to_owned();
+        // ───── Part 1: figure out what we're adding ─────
+        let dep_strs = dep_requests
+            .iter()
+            .map(|dep| self.normalize_dep_name(&dep.depname).map(str::to_owned));
 
-        // ───── Edits ──────────────────────────────────────────────────── //
-        let feature_name = bin_feature_name(&bin_name);
-        let feature_array = &mut self.0["features"][&feature_name]
+        let feature_activation_strs = feature_requests.iter().map(|feature_req| {
+            self.normalize_dep_name(&feature_req.depname)
+                .map(|dep| format!("{}/{}", dep, feature_req.featurename))
+        });
+
+        let feature_strs: Vec<String> = dep_strs
+            .chain(feature_activation_strs)
+            .collect_oks_or_iter_errs()
+            .map_err(crate::Error::from_nonempty_iter)?;
+
+        // ───── part 2: add it ─────
+        let bin_entry = self
+            .get_bin_entry_mut(input_script_name)
+            .ok_or_else(|| crate::Error::ScriptNotFound(input_script_name.to_owned()))?;
+
+        let feature_array = bin_entry["required-features"]
             .or_insert(Array::new().into())
             .as_array_mut()
             .ok_or_else(|| {
-                crate::Error::ManifestCorrupt(format!(
-                    "'features.{feature_name}' exists but is not an array"
-                ))
+                crate::Error::ManifestCorrupt(
+                    "'required-features' for script 'input_bin_name' is not an array".to_owned(),
+                )
             })?;
 
-        add_unique_string_to_array(feature_array, &format!("dep:{depname}"));
-        for dep_feature in dep_features {
-            add_unique_string_to_array(feature_array, &format!("{depname}/{dep_feature}"));
+        for feature_str in feature_strs {
+            // This is N^2 ... but, um, how many features are you adding that this is an issue?
+            add_unique_string_to_array(feature_array, &feature_str);
         }
 
         Ok(())
     }
 
+    // ───── internal helpers ───────────────────────────────────────── //
+    fn normalize_dep_name(&self, input_name: &str) -> crate::Result<&str> {
+        fn _canonicalize_name(s: &str) -> String {
+            s.replace('-', "_")
+        }
+
+        self.find_dep_name(input_name)
+            .ok_or_else(|| crate::Error::DependencyNotFound((*input_name).to_owned()))
+    }
+
     /// Find a script matching the input name.
     /// To match `cargo` behavior, this is case- and
-    //     /// undescore/hyphen-insensitive
+    /// undescore/hyphen-insensitive
     fn find_dep_name(&self, input_dep_name: &str) -> Option<&str> {
-        fn _normalize_name(s: &str) -> String {
+        fn _canonicalize_name(s: &str) -> String {
             s.replace('-', "_")
         }
         let canonicalized_input = _canonicalize_name(input_dep_name);
@@ -172,15 +180,46 @@ impl CargoDotToml {
     /// Find a script matching the input name.
     /// Similar to cargo's package-matching behavior, this is case- and
     /// undescore/hyphen-insensitive
-    fn find_bin_name(&self, input_name: &str) -> Option<&str> {
-        let bin_array = self.0.get("bin")?.as_array_of_tables()?;
+    fn get_bin_entry_mut(&mut self, input_name: &str) -> Option<&mut Table> {
+        let bin_array = self.0.get_mut("bin")?.as_array_of_tables_mut()?;
         let canonicalized_input = _canonicalize_name(input_name);
 
-        bin_array
+        bin_array.iter_mut().find(|table| {
+            table
+                .get("name")
+                .and_then(Item::as_str)
+                .map(|name| _canonicalize_name(name) == canonicalized_input)
+                .unwrap_or(false)
+        })
+    }
+
+    pub fn find_bin_name(&self, input_name: &str) -> Option<&str> {
+        let canonicalized_input = _canonicalize_name(input_name);
+
+        self.0
+            .get("bin")?
+            .as_array_of_tables()?
             .iter()
             .filter_map(|table| table.get("name"))
             .filter_map(Item::as_str)
             .find(|realname| _canonicalize_name(realname) == canonicalized_input)
+    }
+
+    fn table_to_script_entry(table: &Table) -> ScriptEntry<'_> {
+        ScriptEntry {
+            name: table.get("name").and_then(Item::as_str).unwrap_or(MISSING),
+            path: table.get("path").and_then(Item::as_str).unwrap_or(MISSING),
+            required_features: table
+                .get("required-features")
+                .and_then(Item::as_array)
+                .map(|array| {
+                    array
+                        .iter() // MAYBE: maybe don't ignore non-string items? (i.e., errors)
+                        .filter_map(Value::as_str)
+                        .collect::<Vec<&str>>()
+                })
+                .unwrap_or(vec![]),
+        }
     }
 }
 
@@ -195,11 +234,6 @@ fn add_unique_string_to_array(arr: &mut Array, s: &str) {
     if !arr.iter().any(|item| item.as_str() == Some(s)) {
         arr.push(s);
     }
-}
-
-fn bin_feature_name(bin_name: &str) -> String {
-    let delim = if bin_name.contains('_') { '_' } else { '-' };
-    format!("{bin_name}{delim}deps")
 }
 
 #[cfg(test)]
@@ -226,7 +260,7 @@ edition = "252525"  # now this song is going through your head
 [[bin]]
 name = "do-thing"
 path = "do_thing.rs"
-required-features = ["do-thing-deps"]
+required-features = []
 
 [features]
 do-thing-deps = []
@@ -235,29 +269,73 @@ do-thing-deps = []
         assert_eq!(actual, expected);
     }
 
+    fn depreq(dep: &str) -> data::DepRequest {
+        data::DepRequest {
+            depname: dep.to_owned(),
+            version: None,
+            input_string: "whatever".to_owned(),
+        }
+    }
+
+    fn featurereq(dep: &str, feature: &str) -> data::FeatureRequest {
+        data::FeatureRequest {
+            depname: dep.to_owned(),
+            featurename: feature.to_owned(),
+        }
+    }
+
     #[test]
     fn test_add_to_array() {
-        let toml = r#"
+        let input = r#"
+[dependencies]
+d1 = {version = "1.2.3", optional=true}
+d2 = {version = "1.2.3", optional=true}
+
 [features]
-# rare doodah right here
-existing-deps = ["dep:mydep", "1", "a/b",]
+d1 = ["dep:d1"]
+d2 = ["dep:d2"]
+
+[[bin]]
+name = "s1"
+path = "src/s1.rs"
+
+[[bin]]
+name = "s2"
+path = "src/s2.rs"
+required-features = ["d2", "something"]
 "#;
 
-        let mut doc = CargoDotToml::from_string(toml).unwrap();
+        let mut doc = CargoDotToml::from_string(input).unwrap();
 
-        doc.add_dep_to_feature("new", "mydep", &["harfbuzz".to_string()])
+        doc.activate_features("s1", &[depreq("d1")], &[featurereq("d2", "f2")])
             .unwrap();
-        doc.add_dep_to_feature("existing", "mydep", &["harfbuzz".to_string()])
-            .unwrap();
+        doc.activate_features(
+            "s2",
+            &[depreq("d1"), depreq("d2")],
+            &[featurereq("d1", "f1"), featurereq("d2", "f2")],
+        )
+        .unwrap();
 
         let actual = doc.render();
         let expected = r#"
-[features]
-# rare doodah right here
-existing-deps = ["dep:mydep", "1", "a/b", "mydep/harfbuzz",]
-new-deps = ["dep:mydep", "mydep/harfbuzz"]
-"#;
+[dependencies]
+d1 = {version = "1.2.3", optional=true}
+d2 = {version = "1.2.3", optional=true}
 
+[features]
+d1 = ["dep:d1"]
+d2 = ["dep:d2"]
+
+[[bin]]
+name = "s1"
+path = "src/s1.rs"
+required-features = ["d1", "d2/f2"]
+
+[[bin]]
+name = "s2"
+path = "src/s2.rs"
+required-features = ["something", "d2", "d1", "d1/f1", "fd2/f2"]
+"#;
         assert_eq!(actual, expected);
     }
 }
