@@ -1,4 +1,7 @@
+use std::cell::OnceCell;
 use std::path::PathBuf;
+
+use crate::util;
 
 derive_alias! {
     #[derive(PlainData!)] = #[derive(Clone, Debug, PartialEq, Eq)];
@@ -12,7 +15,7 @@ derive_alias! {
 /// all of the strings should be canonicalized/normalized to
 /// the extent possible.
 #[derive(PlainData!)]
-pub struct ScriptRequest {
+pub struct ScriptConfigRequest {
     pub script: String,
     pub deps: Vec<DepRequest>,
     pub features: Vec<FeatureRequest>,
@@ -42,14 +45,41 @@ pub struct FeatureRequest {
     pub featurename: String,
 }
 
-// ───── Data from cargo.toml ───────────────────────────────────── //
-/// Metadata from `[package.metadata.cargo-playground]`
-#[derive(PlainData!)]
-pub struct PlaygroundMetadata {
-    pub enabled: bool,
-    pub editable: bool,
-    pub editor_cmd: Option<String>,
+/// Newtype wrapper for script names w/ cached canonicalization
+#[derive(Clone, Debug, Eq)]
+pub struct ScriptName {
+    pub name: String,
+    _canonicalized: OnceCell<String>,
 }
+
+impl PartialEq for ScriptName {
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical() == other.canonical()
+    }
+}
+
+impl ScriptName {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            _canonicalized: Default::default(),
+        }
+    }
+
+    pub fn canonical(&self) -> &str {
+        self._canonicalized
+            .get_or_init(|| util::canonicalize_crate_name(&self.name))
+    }
+}
+
+// ───── Data from cargo.toml ───────────────────────────────────── //
+// /// Metadata from `[package.metadata.cargo-playground]`
+// #[derive(PlainData!)]
+// pub struct PlaygroundMetadata {
+//     pub enabled: bool,
+//     pub editable: bool,
+//     pub editor_cmd: Option<String>,
+// }
 
 /// A playground script (aka a `[[bin]]` table) in Cargo.toml.
 #[derive(PlainData!)]

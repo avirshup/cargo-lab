@@ -4,10 +4,9 @@ use std::process;
 
 use color_print::{ceprintln, cprintln};
 
-use crate::config::GlobalCtx;
-use crate::manifest_data::ManifestData;
+use crate::global_ctx::GlobalCtx;
 use crate::manifest_editor::ManifestEditor;
-use crate::{config, data, util};
+use crate::{data, global_ctx, util};
 
 /// Run the requested script via `cargo run` and activating the desired features
 ///
@@ -17,20 +16,20 @@ use crate::{config, data, util};
 pub fn run_script(
     bin_name: &str,
     args: &[String],
-    cargo_exe: &Path,
-    manifest: &ManifestData,
+    ctx: GlobalCtx,
 ) -> crate::Result<()> {
-    let script = manifest
+    let script_entry = ctx
+        .manifest_data()?
         .get_script(bin_name)
         .ok_or_else(|| crate::Error::ScriptNotFound(bin_name.to_owned()))?;
 
-    let mut cmd = process::Command::new(cargo_exe);
+    let mut cmd = process::Command::new(&ctx.cargo_exe);
     cmd.args([
         "run",
         "--bin",
-        &script.name,
+        &script_entry.name,
         "--features",
-        &script.required_features.join(","),
+        &script_entry.required_features.join(","),
         "--",
     ])
     .args(args);
@@ -44,8 +43,9 @@ pub fn run_script(
 
 /// Create a new script from a template, w/ optional dependencies
 pub fn new_script(
-    request: &data::ScriptRequest,
+    request: &data::ScriptConfigRequest,
     template_name: &str,
+    then_edit: bool,
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
     // early exit if script matching this name already exists
@@ -56,7 +56,7 @@ pub fn new_script(
     // ───── Part 1: run cargo add if necessary ─────────────────────── //
     // (if it was necessary, this returns a new context since
     // it will have modified Cargo.toml)
-    // TODO: it would be nice to keep the original context around?
+    // TODO: would it be nice to keep the original context around?
     let new_ctx = _run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
 
     // ───── Part 2: create the new script ──────────────────────────── //
@@ -90,19 +90,25 @@ pub fn new_script(
     // update it on disk
     _update_and_show_diff(&manifest_editor, &paths.cargo_dot_toml)?;
 
+    // launch editor if requested
+    if then_edit {
+        edit_script(&request.script, &None, new_ctx.reload())?;
+    }
+
     Ok(())
 }
 
 /// Add dependencies and activate features for an existing script
 pub fn inject_deps(
-    request: &data::ScriptRequest,
+    request: &data::ScriptConfigRequest,
+    then_edit: bool,
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
     // ───── Early exits ─────
     let orig_manifest = ctx.manifest_data()?;
-    if orig_manifest.get_script(&request.script).is_none() {
-        return Err(crate::Error::ScriptNotFound(request.script.clone()));
-    }
+    let orig_script = orig_manifest
+        .get_script(&request.script)
+        .ok_or_else(|| crate::Error::ScriptNotFound(request.script.clone()))?;
     if request.deps.is_empty() && request.features.is_empty() {
         return Ok(());
     }
@@ -123,7 +129,23 @@ pub fn inject_deps(
     // update it on disk
     _update_and_show_diff(&manifest_editor, &paths.cargo_dot_toml)?;
 
+    // launch editor if requested
+    if then_edit {
+        edit_script(&orig_script.name, &None, new_ctx.reload())?;
+    }
+
     Ok(())
+}
+
+pub fn show_script(name: &str, ctx: GlobalCtx) -> crate::Result<()> {
+    let manifest_data = ctx.manifest_data()?;
+
+    if let Some(entry) = manifest_data.get_script(name) {
+        _print_script_info(entry, &ctx);
+        Ok(())
+    } else {
+        Err(crate::Error::ScriptNotFound(name.to_owned()))
+    }
 }
 
 /// Display script information to stdout
@@ -132,7 +154,7 @@ pub fn list_scripts(ctx: GlobalCtx) -> crate::Result<()> {
     let manifest_path = &ctx.project_paths()?.cargo_dot_toml;
 
     // if not quiet, show manifest path too
-    if ctx.verbosity > config::Quiet {
+    if ctx.verbosity > global_ctx::Quiet {
         ceprintln!(
             "<blue>manifest:</>{}/<cyan>{}</> \n",
             manifest_path.parent().unwrap().display(),
@@ -145,31 +167,49 @@ pub fn list_scripts(ctx: GlobalCtx) -> crate::Result<()> {
     let mut script_iter = manifest_data.iter_script_entries().peekable();
 
     // Warning if there are no scripts found
-    if ctx.verbosity > config::Quiet && script_iter.peek().is_none() {
+    if ctx.verbosity > global_ctx::Quiet && script_iter.peek().is_none() {
         ceprintln!(
             "<yellow>warning:</> No [[bin]] entries found in {}",
             manifest_path.display()
         );
     };
 
-    for data::ScriptEntry {
-        name,
-        path,
-        required_features,
-    } in script_iter
-    {
-        if ctx.verbosity > config::Quiet {
-            cprintln!(
-                "\
-- <green>{name}</>:
-    <blue>path:</> {path}
-    <blue>dependencies:</> {required_features:?}
-"
-            );
-        } else {
-            println!("{name}");
-        }
+    for entry in script_iter {
+        _print_script_info(entry, &ctx);
     }
+    Ok(())
+}
+
+/// Run a command to open an editor for the script
+pub fn edit_script(
+    script_name: &str,
+    custom_cmd: &Option<Vec<String>>,
+    ctx: GlobalCtx,
+) -> crate::Result<()> {
+    let script_entry = ctx
+        .manifest_data()?
+        .get_script(script_name)
+        .ok_or_else(|| crate::Error::ScriptNotFound(script_name.to_owned()))?;
+
+    let cmd = custom_cmd
+        .as_ref()
+        .or_else(|| {
+            ctx.playground_config()
+                .as_ref()
+                .and_then(|cfg| cfg.editor_cmd.as_ref())
+        })
+        .filter(|v| !v.is_empty())
+        .ok_or(crate::Error::NeedEditorCmd())?;
+
+    let project_root = &ctx.project_paths()?.manifest_dir;
+    let mut proc = process::Command::new(&cmd[0]);
+    proc.current_dir(project_root)
+        .args(&cmd[1..])
+        .arg(script_entry.path);
+
+    util::show_invocation(&proc);
+    util::run_subproc(proc)?;
+
     Ok(())
 }
 
@@ -241,5 +281,26 @@ fn _run_cargo_add(
                 Ok(ctx.reload())
             }
         }
+    }
+}
+
+fn _print_script_info(
+    data::ScriptEntry {
+        name,
+        path,
+        required_features,
+    }: data::ScriptEntry,
+    ctx: &GlobalCtx,
+) {
+    if ctx.verbosity > global_ctx::Quiet {
+        cprintln!(
+            "\
+- <green>{name}</>:
+    <blue>path:</> {path}
+    <blue>dependencies:</> {required_features:?}
+"
+        );
+    } else {
+        println!("{name}");
     }
 }

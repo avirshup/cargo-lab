@@ -18,7 +18,7 @@ pub fn parse_dep_arg(dep_arg: &str) -> crate::Result<data::DepRequest> {
     let mut field_iter = dep_arg.splitn(2, '@');
     let depname = field_iter
         .next()
-        .ok_or_else(|| crate::Error::InputErr(dep_arg.to_string()))?
+        .ok_or_else(|| crate::Error::CliArgParseFail(dep_arg.to_string()))?
         .to_owned();
     let version = field_iter.next().map(str::to_owned);
 
@@ -49,9 +49,9 @@ fn _parse_one_feature(
     feature_arg: &str,
 ) -> crate::errors::Result<FeatureCliInput> {
     let mut field_iter = feature_arg.splitn(2, '/');
-    let part1 = field_iter
-        .next()
-        .ok_or_else(|| crate::Error::InputErr(feature_arg.to_string()))?;
+    let part1 = field_iter.next().ok_or_else(|| {
+        crate::Error::CliArgParseFail(feature_arg.to_string())
+    })?;
 
     match field_iter.next() {
         Some(part2) => Ok(FeatureCliInput {

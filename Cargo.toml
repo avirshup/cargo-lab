@@ -23,5 +23,5 @@ serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 winnow = { version = "1.0.1", optional = true }
 
-# Trust: high (widely used)
+# Trust: pretty high (widely used)
 macro_rules_attribute = "0.2.2"

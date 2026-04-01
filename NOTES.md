@@ -1,4 +1,4 @@
-_# How to get dynamic autocomplete working
+# How to get dynamic autocomplete working
 
 `clap_complete` has 2 different, possibly incompatible ways
 to generate the autocomplete config for a given shell.

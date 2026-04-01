@@ -93,7 +93,7 @@ impl ManifestEditor {
             .or_insert(ArrayOfTables::new().into())
             .as_array_of_tables_mut()
             .ok_or_else(|| {
-                crate::Error::ManifestCorrupt(
+                crate::Error::ManifestStructureErr(
                     "'[[bin]]' key exists but is not an array of tables"
                         .to_string(),
                 )
@@ -104,9 +104,7 @@ impl ManifestEditor {
             .iter()
             .any(|table| table["name"].as_str() == Some(bin_name))
         {
-            return Err(crate::Error::AlreadyExists(format!(
-                "Bin with name '{bin_name}' already exists"
-            )));
+            return Err(crate::Error::ScriptNameConflict(bin_name.to_owned()));
         };
 
         // create the `[[bin]]` table entry
@@ -179,7 +177,7 @@ impl ManifestEditor {
             .or_insert(Array::new().into())
             .as_array_mut()
             .ok_or_else(|| {
-                crate::Error::ManifestCorrupt(
+                crate::Error::ManifestStructureErr(
                     "'required-features' for script 'input_bin_name' is not \
                      an array"
                         .to_owned(),
@@ -258,13 +256,13 @@ impl ManifestEditor {
         table
             .get(key)
             .ok_or_else(|| {
-                crate::Error::ManifestCorrupt(format!(
+                crate::Error::ManifestStructureErr(format!(
                     "{err_place} is missing required key '{key}'"
                 ))
             })?
             .as_str()
             .ok_or_else(|| {
-                crate::Error::ManifestCorrupt(format!(
+                crate::Error::ManifestStructureErr(format!(
                     "In, {err_place} '{key}' must be a string"
                 ))
             })
