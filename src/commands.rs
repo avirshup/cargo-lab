@@ -5,7 +5,7 @@ use crate::{config, data};
 use color_print::{ceprintln, cprintln};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::{fs, process};
+use std::process;
 // /// Attempt to open a dependency's manifest in a browser.
 // ///
 // ///
@@ -45,7 +45,11 @@ use std::{fs, process};
 /// ONLY RETURNS UPON FAILURE - if everything works right,
 /// this `exec`s the cargo run
 /// command, so the invoked process replaces this one.
-pub fn run_script(bin_name: &str, args: &[String], cfg: &config::Config) -> crate::Result<()> {
+pub fn run_script(
+    bin_name: &str,
+    args: &[String],
+    cfg: &config::Config,
+) -> crate::Result<()> {
     let cargo_doc = CargoDotToml::read(&cfg.cargo_dot_toml)?;
     let script = cargo_doc
         .get_script(bin_name)
@@ -203,7 +207,10 @@ fn _bin_name_to_src_filename(bin_name: &str) -> String {
     format!("src/{}.rs", bin_name.replace('-', "_"))
 }
 
-fn _update_and_show_diff(toml: &CargoDotToml, target: &Path) -> crate::errors::Result<()> {
+fn _update_and_show_diff(
+    toml: &CargoDotToml,
+    target: &Path,
+) -> crate::errors::Result<()> {
     // back it up first
     let backup = target.with_added_extension("bak");
     util::copy_file(target, &backup)?;

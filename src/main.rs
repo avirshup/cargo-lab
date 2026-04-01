@@ -1,9 +1,4 @@
-mod cargo_cli_helpers;
 mod cli;
-mod cli_arg_macros;
-mod cli_completions;
-mod cli_parsers;
-mod cli_style;
 mod commands;
 mod config;
 mod data;
@@ -18,10 +13,10 @@ use std::io;
 
 fn main() -> Result<()> {
     // note that this won't return if `$COMPLETE` env var is set
-    cli_completions::maybe_exec_dynamic_automcomplete();
+    cli::maybe_exec_dynamic_automcomplete();
 
     // clap ensures that at most one of "-q" or "-v[v]" was specified
-    let args = cargo_cli_helpers::parse_argv();
+    let args = cli::parse_argv();
     let verbosity = match (args.general.quiet, args.general.verbose) {
         (true, _) => config::Quiet,
         (false, 0) => config::Normal,
@@ -74,10 +69,8 @@ fn run(args: cli::PlaygroundCli, cfg: Config) -> Result<()> {
             )?;
 
             // if dependencies/features were requested, install them now
-            let feature_requests = cli_parsers::resolve_feature_requests(
-                &input_deps,
-                input_features,
-            )?;
+            let feature_requests =
+                cli::resolve_feature_requests(&input_deps, input_features)?;
             commands::inject_deps(
                 &bin_name,
                 &input_deps,
@@ -101,10 +94,8 @@ fn run(args: cli::PlaygroundCli, cfg: Config) -> Result<()> {
                 },
         } => {
             // ───── Extra parsing for features ─────────────────────────────── //
-            let feature_requests = cli_parsers::resolve_feature_requests(
-                &input_deps,
-                input_features,
-            )?;
+            let feature_requests =
+                cli::resolve_feature_requests(&input_deps, input_features)?;
             commands::inject_deps(
                 &bin_name,
                 &input_deps,
@@ -122,10 +113,7 @@ fn run(args: cli::PlaygroundCli, cfg: Config) -> Result<()> {
                 )
             })?;
 
-            cli_completions::write_completion_script(
-                requested_shell,
-                io::stdout(),
-            )?;
+            cli::write_completion_script(requested_shell, io::stdout())?;
         },
 
         cli::SubCmd::DoNothing {} => (),

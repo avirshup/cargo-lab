@@ -1,7 +1,7 @@
 //! Tools for determining whether this was invoked as a cargo subcommand
 //! or not and then parsing argv accordingly
 use crate::cli;
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -28,7 +28,8 @@ impl InvocationType {
         let bin_name = bin_path.file_stem().and_then(OsStr::to_str);
 
         // was it invoked as "cargo-subcmd subcmd [...]" or nah?
-        if let Some(cargo_subcmd) = bin_name.and_then(|s| s.strip_prefix("cargo-"))
+        if let Some(cargo_subcmd) =
+            bin_name.and_then(|s| s.strip_prefix("cargo-"))
             && let Some(arg1) = maybe_arg1
             && arg1 == cargo_subcmd
         {
@@ -66,7 +67,7 @@ pub fn parse_argv() -> cli::PlaygroundCli {
             clap_arg0.push(&subcmd);
 
             clap_argv
-        }
+        },
     };
 
     cli::PlaygroundCli::parse_from(argv_slice)
