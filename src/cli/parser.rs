@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use clap::builder::Styles;
 use clap::{Args, Parser, Subcommand};
-use clap_complete::Shell;
 
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
@@ -36,7 +35,7 @@ pub struct MainCli {
 
 #[derive(Args, Clone, Debug)]
 pub struct GlobalArgs {
-    /// Path to the playground manifest directory
+    /// Path to the playground's manifest directory
     #[arg(
         long,
         global = true,
@@ -75,16 +74,24 @@ pub enum SubCmd {
     #[command(name = "list")]
     ListScripts,
 
+    /// Show info about a script
+    #[command(name = "info")]
+    ShowScriptInfo(ShowScriptInfo),
+
     /// Add a dependency to a script
     #[command(name = "inject")]
     InjectDeps(InjectDeps),
+
+    /// Open a script in your editor
+    #[command(name = "edit")]
+    EditScript(EditScript),
 
     /// Shell autocompletions
     #[command(
         name = "completions",
         long_about = "Print shell autocompletion script to stdout."
     )]
-    InstallCompletions(InstallCompletions),
+    WriteCompletionScript(WriteCompletionScript),
 
     /// For debugging, hidden from output
     #[command(name = "do-nothing", hide = true)]
@@ -102,7 +109,7 @@ pub struct RunScript {
             add = script_name_completer(),
             value_name = "SCRIPT"
     )]
-    pub bin_name: String,
+    pub script_name: String,
 
     #[arg(help = "Arguments forwarded to 'cargo run'")]
     pub args: Vec<String>,
@@ -112,14 +119,28 @@ pub struct RunScript {
 #[derive(Args, Clone, Debug)]
 pub struct NewScript {
     #[arg(help = "name of the script to create", value_name = "SCRIPT")]
-    pub bin_name: String,
+    pub script_name: String,
 
     #[arg(short, long, default_value = "bare", add = template_name_completer())]
     pub template: String,
 
+    #[arg(
+        long,
+        help = "Open the script in editor after creating it.",
+        long_help = "Open the script in editor after creating it \
+                     (`package.metadata.cargo-playground.editor-cmd` must be \
+                     set in manifest.)"
+    )]
+    pub edit: bool,
+
     #[command(flatten, next_help_heading = "Dependencies")]
     pub inject_args: InjectArgs,
 }
+
+// TODO: scripts should say which dependencies they have available?
+//   Maybe "--add-use-statements" to add those? Maybe keep
+//   commented-out cargo frontmatter up-to-date? Or maybe
+//   `#[cfg(feature)]` attributes (or not, those are very noisy-looking)
 
 /// Add dependencies for a srcipt
 #[derive(Clone, Args, Debug)]
@@ -129,22 +150,63 @@ pub struct InjectDeps {
         add = script_name_completer(),
         value_name = "SCRIPT"
     )]
-    pub bin_name: String,
+    pub script_name: String,
+
+    #[arg(
+        long,
+        help = "Open the script in editor after installing dependencies.",
+        long_help = "Open the script in editor after installing dependencies \
+                     (`package.metadata.cargo-playground.editor-cmd` must be \
+                     set in manifest.)"
+    )]
+    pub edit: bool,
 
     #[command(flatten)]
     pub inject_args: InjectArgs,
 }
 
-/// Manage CLI completions for th
+/// Print information about script
 #[derive(Clone, Args, Debug)]
-pub struct InstallCompletions {
+pub struct ShowScriptInfo {
     #[arg(
-        short,
-        long,
-        help = "Shell to generate autocompletions for (if not pased, attempt \
-                to detect current shell)"
+        add = script_name_completer(),
     )]
-    pub shell: Option<Shell>,
+    pub script_name: String,
+}
+
+/// Open script in editor
+#[derive(Clone, Args, Debug)]
+pub struct EditScript {
+    #[arg(
+        help = "name of the script to edit",
+        add = script_name_completer(),
+        value_name = "SCRIPT"
+    )]
+    pub script_name: String,
+
+    #[arg(
+        long="cmd",
+        allow_hyphen_values = true,
+        num_args = 0..,
+        help = "Command to invoke editor",
+        long_help = "Custom command to invoke editor; \
+        all arguments after this flag ('--cmd') will be interpreted as \
+        the arguments to invoke the editor.
+
+Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set."
+    )]
+    pub editor_cmd: Option<Vec<String>>,
+}
+
+/// Print CLI completion script to stdout.
+///
+/// TODO: instructions on how to install / activate
+#[derive(Clone, Args, Debug)]
+pub struct WriteCompletionScript {
+    // TODO: list supported shells (
+    // see `clap_complete::env::Shells::builtins()`)
+    #[arg(help = "Shell name ('bash' / 'fish' / etc.)")]
+    pub shell: String,
 }
 
 #[derive(Clone, Args, Debug)]
@@ -178,8 +240,9 @@ The [DEPNAME/] prefix may be omitted if exactly one dependency has been specifie
     pub cargo_add_args: CargoAddArgs,
 }
 
-// TODO: this should just be a regular struct definition w/ a macro
-//   (use `macro_rules_attribute` and/or `derive_deftly`)
+// MAYBN: this should just be a regular struct definition w/ a derive macro
+//   (use `macro_rules_attribute` and/or `derive_deftly`)?
+//   Although ... using a DSL is tbh easier?
 build_passthrough_long_args!(
     /// Specific args to be forwarded to cargo add
     ///

@@ -1,4 +1,4 @@
-/// Something that can generate some arguments for another program
+/// Something that can generate CLI arguments
 pub trait GeneratesArgs {
     fn cli_args(&self) -> Vec<String>;
 }
@@ -49,8 +49,7 @@ pub trait GeneratesArgs {
 /// (or really 2 to make it testable) for the proc macro.
 ///
 /// This could also just be done at runtime with an array of
-/// strings and a build-style clap CLI, instead of a
-/// macro generating derive structs)
+/// strings and a build-style clap CLI)
 #[macro_export]
 macro_rules! build_passthrough_long_args {
     (
@@ -76,12 +75,19 @@ macro_rules! build_passthrough_long_args {
 
                 $(
                     if let Some(ref $kvflag) = self.$kvflag {
-                        vec.push(format!(concat!("--", stringify!($kvflag), "={}"), $kvflag));
+                        vec.push(format!(
+                            concat!("--", stringify!($kvflag), "={}"),
+                            $kvflag
+                        ));
                     }
                 )*
 
                 $(
-                    if self.$boolflag { vec.push(concat!("--", stringify!($boolflag)).to_owned()); }
+                    if self.$boolflag {
+                        vec.push(
+                            concat!("--", stringify!($boolflag))
+                                .to_owned()
+                        ); }
                 )*
 
                 vec

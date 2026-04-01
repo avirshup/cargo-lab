@@ -1,24 +1,30 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
+// TODO: clean this up, it might be time to Box<dyn> it
 #[derive(Debug, thiserror::Error, Clone)]
 pub enum Error {
-    #[error("TOML parsing error: {0}")]
-    ParseErr(#[from] toml_edit::TomlError),
+    #[error("Encountered multiple errors")] // TODO: display them
+    MultipleErrors(Vec<Error>),
 
-    #[error("IO operation error: {desc} ({err})")]
-    IoFail { desc: String, err: String },
+    // HACK: This is not really an error, it should not be here,
+    // (although it SHOULD be an error if it were ever
+    // to bubble up)
+    #[error("Internal error, this should not happen")]
+    SkipMe,
 
-    #[cfg(feature = "experimental_cargo_script_rfc3502")]
-    #[error("RFC 3502 parsing error: {0}")]
-    EmbeddedScriptErr(
-        #[from] crate::vendor_cargo::frontmatter::FrontmatterError,
-    ),
-
+    // ───── General runtime env problems ─────
     #[error("Required env var missing: {0}")]
     EnvVarMissing(String),
 
-    #[error("TOML parsing error: {0}")]
-    TomlParsingFailed(#[from] toml_edit::de::Error),
+    #[error("Config discovery failed: {0}")]
+    NoConfig(String),
+
+    #[error("Unknown shell: {0}")]
+    UnknownShell(String),
+
+    // ───── I/o / subproc related ─────
+    #[error("IO operation error: {desc} ({err})")]
+    IoFail { desc: String, err: String },
 
     #[error("Failed to copy {src} to {dest}: {err}")]
     CopyFailed {
@@ -27,17 +33,41 @@ pub enum Error {
         err: String,
     },
 
-    #[error("Config discovery failed: {0}")]
-    NoConfig(String),
-
-    #[error("{0}")]
-    AlreadyExists(String),
-
     #[error("{0}")]
     CargoFail(String),
 
+    #[error("{description} not found ('{path}' does not exist)")]
+    FileErr { path: String, description: String },
+
+    // ───── TOML-related ─────
+    #[error("TOML parsing error: {0}")]
+    TomlParseErr(#[from] toml_edit::TomlError),
+
+    // When there's an error deserializing the (already-parsed)
+    // TOML into the expected structure
+    #[error("TOML structure error: {0}")]
+    TomlStructureErr(#[from] toml_edit::de::Error),
+
+    // This is basically the same thing as `TomlStructureErr` but
+    // it arises when navigating the TOML manually
     #[error("{0}")]
-    ManifestCorrupt(String),
+    ManifestStructureErr(String),
+
+    #[cfg(feature = "experimental_cargo_script_rfc3502")]
+    #[error("RFC 3502 parsing error: {0}")]
+    EmbeddedScriptErr(
+        #[from] crate::vendor_cargo::frontmatter::FrontmatterError,
+    ),
+
+    // ───── Input-related errors ─────
+    #[error("Failed to parse CLI argument '{0}'")]
+    CliArgParseFail(String),
+
+    #[error(
+        "To launch an editor, please set the 'editor-cmd' key in the \
+         '[project.metadata.cargo-playground]' table in `Cargo.toml`"
+    )]
+    NeedEditorCmd(),
 
     #[error("No script matching '{0}' found in Cargo.toml")]
     ScriptNotFound(String),
@@ -53,12 +83,6 @@ pub enum Error {
          i.e., 'depname/{0}'."
     )]
     AmbiguousFeature(String),
-
-    #[error("Failed to parse CLI argument '{0}'")]
-    InputErr(String),
-
-    #[error("Encountered multiple errors")] // TODO: display them
-    MultipleErrors(Vec<Error>),
 }
 
 impl Error {
@@ -79,9 +103,9 @@ impl Error {
         }
     }
 
-    pub fn from_serde_err(err: impl serde::de::Error) -> Self {
-        Self::ManifestCorrupt(err.to_string())
-    }
+    // pub fn from_serde_err(err: impl serde::de::Error) -> Self {
+    //     Self::ManifestCorrupt(err.to_string())
+    // }
 }
 
 /// Lets us apply `?` to borrowed errors (which we get from cached results)
