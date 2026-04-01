@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -166,10 +167,7 @@ impl CargoDotToml {
                 )
             })?;
 
-        for feature_str in feature_strs {
-            // This is N^2 ... but, um, how many features are you adding that this is an issue?
-            _add_unique_string_to_array(feature_array, &feature_str);
-        }
+        _add_unique_strings_to_array(feature_array, feature_strs.into_iter());
 
         Ok(())
     }
@@ -181,7 +179,7 @@ impl CargoDotToml {
         })
     }
 
-    /// Find a script matching the input name.
+    /// Find a script matching the input name
     /// To match `cargo` behavior, this is case- and
     /// undescore/hyphen-insensitive
     fn find_dep_name(&self, input_dep_name: &str) -> Option<&str> {
@@ -246,9 +244,21 @@ fn _canonicalize_name(s: &str) -> String {
     s.to_lowercase().replace('-', "_")
 }
 
-fn _add_unique_string_to_array(arr: &mut Array, s: &str) {
-    if arr.iter().all(|item| item.as_str() != Some(s)) {
-        arr.push(s);
+fn _add_unique_strings_to_array(
+    arr: &mut Array,
+    new_strs: impl Iterator<Item = String>,
+) {
+    let mut existing: HashSet<String> = arr
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)  // because we can't borrow here
+        .collect();
+
+    for new_str in new_strs {
+        if !existing.contains(&new_str) {
+            arr.push(&new_str);
+            existing.insert(new_str);
+        }
     }
 }
 
@@ -257,14 +267,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_add_new_bin() {
-        let toml = r#"
+    fn test_get_script() {
+        const TOML: &str = r#"
+[[bin]]
+name = "my-script"
+path = "src/my_script.rs"
+required-features = ["hi", "hi/there"]
+"#;
+
+        let doc = CargoDotToml::from_string(TOML).unwrap();
+        let expected = Some(ScriptEntry {
+            name: "my-script",
+            path: "src/my_script.rs",
+            required_features: vec![],
+        });
+
+        for name in ["my-script", "My_ScriPt"] {
+            let actual = doc.get_script(name);
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn test_add_new_script() {
+        const TOML: &str = r#"
 [package]
 edition = "252525"  # now this song is going through your head
 
 [dependencies]
 "#;
-        let mut doc = CargoDotToml::from_string(toml).unwrap();
+        let mut doc = CargoDotToml::from_string(TOML).unwrap();
         doc.add_new_bin("do-thing", "do_thing.rs").unwrap();
         let actual = doc.render();
         let expected = r#"
@@ -277,9 +309,6 @@ edition = "252525"  # now this song is going through your head
 name = "do-thing"
 path = "do_thing.rs"
 required-features = []
-
-[features]
-do-thing-deps = []
 "#;
 
         assert_eq!(actual, expected);
@@ -301,8 +330,8 @@ do-thing-deps = []
     }
 
     #[test]
-    fn test_add_to_array() {
-        let input = r#"
+    fn test_add_features_while_maintaining_order() {
+        const TOML: &str = r#"
 [dependencies]
 d1 = {version = "1.2.3", optional=true}
 d2 = {version = "1.2.3", optional=true}
@@ -321,7 +350,7 @@ path = "src/s2.rs"
 required-features = ["d2", "something"]
 "#;
 
-        let mut doc = CargoDotToml::from_string(input).unwrap();
+        let mut doc = CargoDotToml::from_string(TOML).unwrap();
 
         doc.activate_features("s1", &[depreq("d1")], &[featurereq("d2", "f2")])
             .unwrap();
@@ -350,7 +379,7 @@ required-features = ["d1", "d2/f2"]
 [[bin]]
 name = "s2"
 path = "src/s2.rs"
-required-features = ["something", "d2", "d1", "d1/f1", "fd2/f2"]
+required-features = ["d2", "something", "d1", "d1/f1", "d2/f2"]
 "#;
         assert_eq!(actual, expected);
     }

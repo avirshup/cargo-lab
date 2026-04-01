@@ -6,9 +6,9 @@
 
 ## "Goal one" milestones
 
-- [ ] **cli**: autocomplete
+- [x] **cli**: autocomplete
     - [x] static for subcmds and flags
-    - [ ] dynamic, for script and template names?
+    - [x] dynamic, for script and template names?
         - Requires **unstable features** from clap! Very _very_ little documentation!
         - note this uses a completely different method for installing completions
           than the normal "static" `clap_complete::generate` functions.
@@ -71,6 +71,8 @@
 
 #### Nice to have
 
+- [ ] Parse `-F/--feature` the same way as cargo (i.e., allow for multiple
+  space-comma separated features in a single argument)
 - [ ] 
   `cargo script` support - manage an ["embedded manifest"](https://rust-lang.github.io/rfcs/3424-cargo-script.html) and keep it
   in sync w/ our `Cargo.toml`
