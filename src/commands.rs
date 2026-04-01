@@ -2,7 +2,7 @@ use crate::cli::CargoAddArgs;
 use crate::manifest_editor::CargoDotToml;
 use crate::util;
 use crate::{config, data};
-use color_print::cprintln;
+use color_print::{ceprintln, cprintln};
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::{fs, process};
@@ -58,12 +58,18 @@ pub fn run_script(bin_name: &str, args: &[String], cfg: &config::Config) -> crat
         script.name,
         "--features",
         &script.required_features.join(","),
+        "--",
     ])
     .args(args);
 
-    println!("> {cmd:?}");
+    util::show_invocation(&cmd);
 
-    Err(cmd.exec().into())
+    let exec_failure = cmd.exec(); // this shouldn't actually ever be set
+
+    Err(crate::Error::IoFail(
+        format!("Failed exec '{cmd:?}`"),
+        exec_failure,
+    ))
 }
 
 pub fn new_script(
@@ -82,14 +88,14 @@ pub fn new_script(
     let src_filename = _bin_name_to_src_filename(bin_name);
     let dest = cfg.manifest_dir.join(&src_filename);
     if dest.is_file() {
-        cprintln!(
+        ceprintln!(
             "<yellow>warning</>: Script '{}' already exists",
             cfg.relpath_project_root(&dest)
         );
     } else {
         let template_path = cfg.template_path(template_name);
         util::copy_file(&template_path, &dest)?;
-        cprintln!(
+        ceprintln!(
             "<green>success</>: Created script: {} -> {}",
             cfg.relpath_project_root(&template_path),
             cfg.relpath_project_root(&dest)
@@ -108,7 +114,7 @@ pub fn list_scripts(cfg: &config::Config) -> crate::Result<()> {
 
     let Some(script_iter) = cargo_doc.list_scripts() else {
         if cfg.verbosity > config::Quiet {
-            cprintln!(
+            ceprintln!(
                 "<yellow>warning:</> No [[bin]] entries found in {}",
                 cfg.cargo_dot_toml.display()
             );
@@ -118,7 +124,7 @@ pub fn list_scripts(cfg: &config::Config) -> crate::Result<()> {
 
     if cfg.verbosity > config::Quiet {
         // TODO: windows path style, probably need a custom formatter
-        cprintln!(
+        ceprintln!(
             "<blue>manifest:</>{}/<cyan>{}</> \n",
             cfg.cargo_dot_toml.parent().unwrap().display(),
             cfg.cargo_dot_toml.file_name().unwrap().display()
@@ -171,8 +177,8 @@ pub fn inject_deps(
             .args(cargo_add_args.cli_args())
             .args(deps.iter().map(|d| &d.input_string));
         util::show_invocation(&cmd);
-        let cargo_add_result = cmd.spawn()?.wait()?;
 
+        let cargo_add_result = util::run_subproc(cmd)?;
         if !cargo_add_result.success() {
             return Err(crate::Error::CargoFail(format!(
                 "`cargo add` command reported failure (status:  {cargo_add_result})"
@@ -206,7 +212,7 @@ fn _update_and_show_diff(toml: &CargoDotToml, target: &Path) -> crate::errors::R
     toml.write(target)?;
 
     // TODO: better output if cargo.toml didn't change
-    println!("Updated Cargo.toml: ");
+    eprintln!("Updated Cargo.toml: ");
 
     let mut cmd = process::Command::new("diff");
     cmd.current_dir(target.parent().unwrap())
@@ -217,7 +223,6 @@ fn _update_and_show_diff(toml: &CargoDotToml, target: &Path) -> crate::errors::R
     // we are ignoring any failure to run `diff` here
     // since it's only for illustrative purpose
     // and the file has already been modified
-    let _ = cmd.spawn()?.wait();
-
+    let _ = util::run_subproc(cmd);
     Ok(())
 }

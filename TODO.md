@@ -6,9 +6,20 @@
 
 ## "Goal one" milestones
 
-- [ ] **cli**: shell autocompletion for script and template names:
-  cargo uses "clap_complete" (unstable?)- [ ] editor integration
-- [ ] fast editing workflow: `cpg edit [name]` / `cpg new --edit [name]`
+- [ ] **cli**: autocomplete
+    - [x] static for subcmds and flags
+    - [ ] dynamic, for script and template names?
+        - Requires **unstable features** from clap! Very _very_ little documentation!
+        - note this uses a completely different method for installing completions
+          than the normal "static" `clap_complete::generate` functions.
+    - [x] ~~Install completions for various
+      shells?~~ NO. Just send the scripts to stdout
+      and then user can figure out where to redirect it for their specific
+      circumstance. Basically the only robust way to "install" these
+      would be to use the system's package manager (and even then,
+      what about oh-my-zsh or similar? woof.)
+- [ ] editor integration / fast editing workflow: `cpg edit [name]` /
+  `cpg new --edit [name]`
     - [ ] Q: Can you tell vscode and/or intellij "open
       _this_ file for editing WITHIN this project"
 - [ ] Cargo.toml discovery
@@ -27,6 +38,10 @@
 
 ## Functionality
 
+### Bugs
+
+- [ ] passing arguments to script via `cargo playground run` is not working yet
+
 ## usage as `cargo playground`
 
 - [ ] require enabling "metadata.playground" flag in Cargo.toml
@@ -41,9 +56,18 @@
 
 - [ ] make it work on **windows** (spawn in `cpg run` instead of
   exec, format paths correctly, make color work)
-- [ ] properer output system (is a logger appropriate for this?)
+- [ ] properer output system
+    - [ ] Use a logging crate? But it's not really "logging" innit.
+      `cargo` uses its own custom output system, maybe just vendor that?
     - [ ] global, configurable / term-dependent disabling of **ANSI color**
+        - probably https://docs.rs/colorchoice-clap/1.0.8/colorchoice_clap/
     - [ ] use stderr for everything that you wouldn't want to pipe
+
+### Tech debt
+
+- [ ] Take more steps to manage printing to stdout (it will break autocomplete
+  if we don't ...)
+- [ ] Migrate the passthrough args to a declarative derive macro
 
 #### Nice to have
 

@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+
 pub const MISSING: &str = "<MISSING>";
 
 // ───── "Requests" from the user ───────────────────────────────── //
 /// A dependency's feature.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct FeatureRequest {
+pub struct FeatureRequest {
     pub depname: String,
     pub featurename: String,
 }
@@ -22,6 +24,12 @@ pub struct DepRequest {
 //     pub depname: String,
 //     pub featurename: String,
 // }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScriptTemplate {
+    pub name: String,
+    pub path: PathBuf,
+}
 
 /// A script (aka a `[[bin]]` table) in Cargo.toml.
 /// If the `name` or `path` is missing, they will
