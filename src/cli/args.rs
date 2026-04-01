@@ -1,8 +1,7 @@
-use crate::cli_completions::{
+use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
 };
-use crate::cli_parsers;
-use crate::cli_style;
+use super::{parsers, style};
 use crate::{build_passthrough_long_args, data};
 use clap::builder::Styles;
 use clap::{Args, Parser, Subcommand};
@@ -21,13 +20,13 @@ pub struct PlaygroundCli {
 }
 
 const STYLES: Styles = Styles::styled()
-    .header(cli_style::HEADER)
-    .usage(cli_style::USAGE)
-    .literal(cli_style::LITERAL)
-    .placeholder(cli_style::PLACEHOLDER)
-    .error(cli_style::ERROR)
-    .valid(cli_style::VALID)
-    .invalid(cli_style::INVALID);
+    .header(style::HEADER)
+    .usage(style::USAGE)
+    .literal(style::LITERAL)
+    .placeholder(style::PLACEHOLDER)
+    .error(style::ERROR)
+    .valid(style::VALID)
+    .invalid(style::INVALID);
 
 #[derive(Args, Clone, Debug)]
 pub struct OutputArgs {
@@ -146,7 +145,7 @@ pub struct InjectArgs {
 (depname)[@version], e.g., `clap` or `clap@0.1.2`. Any \
 missing dependencies will be installed with `cargo add`",
         num_args = 0..,
-        value_parser=cli_parsers::parse_dep_arg,
+        value_parser=parsers::parse_dep_arg,
     )]
     pub deps: Vec<data::DepRequest>,
 
@@ -160,9 +159,9 @@ of the form `[DEPNAME/](FEATURENAME)`, e.g., \"somecrate/somefeature\".
 Run `cargo info (DEPNAME)` to see the features available for a given dependency.
 
 The [DEPNAME/] prefix may be omitted if exactly one dependency has been specified.",
-        value_parser = cli_parsers::parse_feature_arg
+        value_parser = parsers::parse_feature_arg
     )]
-    pub features: Vec<cli_parsers::FeatureCliArg>,
+    pub features: Vec<parsers::FeatureCliArg>,
 
     // TODO: this takes up too many lines now??
     #[command(flatten, next_help_heading = "Arguments for \"cargo add\"")]
