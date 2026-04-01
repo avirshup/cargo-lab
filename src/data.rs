@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use camino::Utf8PathBuf;
 
 derive_alias! {
     #[derive(PlainData!)] = #[derive(Clone, Debug, PartialEq, Eq)];
@@ -61,7 +61,7 @@ pub struct FeatureRequest {
 #[derive(PlainData!)]
 pub struct ScriptEntry {
     pub name: String,
-    pub path: String,
+    pub path: Utf8PathBuf, // relative to manifest root!
     pub required_features: Vec<String>,
 }
 
@@ -69,5 +69,5 @@ pub struct ScriptEntry {
 #[derive(PlainData!)]
 pub struct ScriptTemplate {
     pub name: String,
-    pub path: PathBuf,
+    pub path: Utf8PathBuf,
 }

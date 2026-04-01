@@ -1,7 +1,7 @@
 use std::os::unix::process::CommandExt;
-use std::path::Path;
 use std::process;
 
+use camino::Utf8Path;
 use color_print::{ceprintln, cprintln};
 
 use crate::global_ctx::{GlobalCtx, ProjectPaths};
@@ -9,7 +9,7 @@ use crate::manifest_editor::ManifestEditor;
 use crate::{data, global_ctx, util};
 
 pub fn init_new_playground(
-    path: &Path,
+    path: &Utf8Path,
     name: &str,
     edition: &str,
     ctx: GlobalCtx,
@@ -20,8 +20,9 @@ pub fn init_new_playground(
 
     if path.exists() {
         return Err(crate::Error::FileErr {
-            path: path.to_string_lossy().into(),
-            description: "provided playground directory already exists.".into(),
+            path: path.to_owned(),
+            description: "provided playground directory already exists."
+                .to_owned(),
         });
     }
 
@@ -157,6 +158,71 @@ pub fn new_script(
     Ok(())
 }
 
+/// Change script's name or path
+pub fn rename_script(
+    script_name: &str,
+    maybe_new_name: Option<&str>,
+    maybe_new_path_input: Option<&Utf8Path>,
+    then_edit: bool,
+    ctx: GlobalCtx,
+) -> crate::Result<()> {
+    let paths = ctx.project_paths()?;
+    let orig_manifest = ctx.manifest_data()?;
+
+    let orig_script = orig_manifest
+        .get_script(script_name)
+        .ok_or_else(|| crate::Error::ScriptNotFound(script_name.to_owned()))?;
+
+    // ensure new name is unique
+    if let Some(new_name) = maybe_new_name
+        && orig_manifest.get_script(new_name).is_some()
+    {
+        return Err(crate::Error::ScriptNameConflict(new_name.to_owned()));
+    }
+
+    let maybe_new_path = maybe_new_path_input
+        .map(util::normalize_script_path)
+        .transpose()?;
+
+    // ensure new path does not already exist
+    if let Some(new_name) = maybe_new_name
+        && orig_manifest.get_script(new_name).is_some()
+    {
+        return Err(crate::Error::ScriptNameConflict(new_name.to_owned()));
+    }
+
+    // note we don't actually *write* these changes back until after renaming
+    // the file, so if renaming fails, no changes will have been made
+    let mut manifest_editor = ctx.new_editor()?;
+    manifest_editor.update_bin(
+        &orig_script.name,
+        maybe_new_name,
+        maybe_new_path.as_deref().map(Utf8Path::as_str),
+    )?;
+
+    if let Some(new_path) = maybe_new_path {
+        ceprintln!(
+            "<blue>mv</> <yellow>{}</> -> <green>{}</>",
+            orig_script.path,
+            new_path
+        );
+        util::rename_file(
+            &paths.manifest_dir.join(&orig_script.path),
+            &paths.manifest_dir.join(&new_path),
+        )?;
+    };
+
+    // update it on disk
+    _update_and_show_diff(&manifest_editor, &paths.cargo_dot_toml)?;
+
+    // launch editor if requested
+    if then_edit {
+        edit_script(&orig_script.name, &None, ctx.reload())?;
+    }
+
+    Ok(())
+}
+
 /// Add dependencies and activate features for an existing script
 pub fn inject_deps(
     request: &data::ScriptConfigRequest,
@@ -216,8 +282,8 @@ pub fn list_scripts(ctx: GlobalCtx) -> crate::Result<()> {
     if ctx.verbosity > global_ctx::Quiet {
         ceprintln!(
             "<blue>manifest:</>{}/<cyan>{}</> \n",
-            manifest_path.parent().unwrap().display(),
-            manifest_path.file_name().unwrap().display()
+            manifest_path.parent().unwrap(),
+            manifest_path.file_name().unwrap()
         );
     }
 
@@ -228,8 +294,7 @@ pub fn list_scripts(ctx: GlobalCtx) -> crate::Result<()> {
     // Warning if there are no scripts found
     if ctx.verbosity > global_ctx::Quiet && script_iter.peek().is_none() {
         ceprintln!(
-            "<yellow>warning:</> No [[bin]] entries found in {}",
-            manifest_path.display()
+            "<yellow>warning:</> No [[bin]] entries found in {manifest_path}"
         );
     };
 
@@ -279,7 +344,7 @@ fn _script_name_to_filename(bin_name: &str) -> String {
 
 fn _update_and_show_diff(
     toml: &ManifestEditor,
-    target: &Path,
+    target: &Utf8Path,
 ) -> crate::errors::Result<()> {
     // back it up first
     let backup = target.with_added_extension("bak");
@@ -378,7 +443,7 @@ fn main() {{
 
 /// Create a template for the initial manifest.
 /// Just done as plain text so we can add comments
-pub fn _init_manifest_content(project_name: &str, edition: &str) -> String {
+fn _init_manifest_content(project_name: &str, edition: &str) -> String {
     format!(
         r#"\
 [package]

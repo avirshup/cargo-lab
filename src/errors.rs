@@ -1,3 +1,5 @@
+use camino::Utf8PathBuf;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 // TODO: clean this up, it might be time to Box<dyn> it
@@ -22,8 +24,8 @@ pub enum Error {
 
     #[error("Failed to copy {src} to {dest}: {err}")]
     CopyFailed {
-        src: String,
-        dest: String,
+        src: Utf8PathBuf,
+        dest: Utf8PathBuf,
         err: String,
     },
 
@@ -31,7 +33,10 @@ pub enum Error {
     CargoFail(String),
 
     #[error("Path '{path}': {description})")]
-    FileErr { path: String, description: String },
+    FileErr {
+        path: Utf8PathBuf,
+        description: String,
+    },
 
     // ───── TOML-related ─────
     #[error("TOML parsing error: {0}")]
@@ -68,6 +73,9 @@ pub enum Error {
 
     #[error("Script named '{0}' already exists in Cargo.toml")]
     ScriptNameConflict(String),
+
+    #[error("'{0}' is not a valid filename for a script")]
+    InvalidScriptFilename(Utf8PathBuf),
 
     #[error("No dependency matching '{0}' found in Cargo.toml")]
     DependencyNotFound(String),

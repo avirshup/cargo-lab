@@ -95,8 +95,8 @@ impl ManifestData {
     ) -> impl Iterator<Item = data::ScriptEntry> {
         self.bin.iter().filter_map(|bin_table| {
             Some(data::ScriptEntry {
-                name: bin_table.name.clone()?,
-                path: bin_table.path.clone()?,
+                name: bin_table.name.as_ref()?.clone(),
+                path: bin_table.path.as_ref()?.into(),
                 required_features: bin_table.required_features.clone(),
             })
         })
@@ -286,7 +286,7 @@ edition = "252525"
             manifest.get_script("BiN1"),
             Some(data::ScriptEntry {
                 name: _s("bin1"),
-                path: _s("bin1.rs"),
+                path: "bin1.rs".into(),
                 required_features: vec![_s("a1/a2")],
             })
         );

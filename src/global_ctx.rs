@@ -1,16 +1,16 @@
 use std::cell::OnceCell;
 use std::env;
 use std::env::current_dir;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
 
 pub use Verbosity::*;
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 
 use crate::manifest_data::{ManifestData, PlaygroundConfig};
 use crate::manifest_editor::ManifestEditor;
 use crate::{data, util};
 
+#[cfg(feature = "xtask")]
 const ENV_XTASK_MANIFEST_PATH: &str = "CARGO_MANIFEST_DIR";
 const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
 
@@ -52,10 +52,10 @@ type CachedResult<'a, T> = Result<&'a T, &'a crate::Error>;
 /// fail later if the operation actually requires parsing the manifest).
 pub struct GlobalCtx {
     pub verbosity: Verbosity,
-    pub cwd: PathBuf,
-    pub cargo_exe: PathBuf,
+    pub cwd: Utf8PathBuf,
+    pub cargo_exe: Utf8PathBuf,
 
-    _override_manifest_path: Option<String>,
+    _override_manifest_path: Option<Utf8PathBuf>,
     _project_paths: OnceCell<crate::Result<ProjectPaths>>,
     _manifest_raw: OnceCell<crate::Result<String>>,
     _manifest_data: OnceCell<crate::Result<ManifestData>>,
@@ -74,19 +74,21 @@ impl GlobalCtx {
         verbosity: Verbosity,
         override_manifest_path: Option<String>,
     ) -> Self {
-        let cwd = current_dir()
-            .map_err(|ioerr| crate::ioerr!(ioerr, "Failed to determine CWD"))
-            .unwrap(); // panic so we don't have to return a Result just for this case
+        let cwd: Utf8PathBuf = current_dir()
+            .expect("Process has CWD")
+            .try_into()
+            .expect("CWD is UTF-8"); // panic so we don't have to return a Result just for this case
 
         // TODO: path / cmd to invoke cargo should be configurable?
         let cargo_exe =
-            PathBuf::from(env::var("CARGO").unwrap_or("cargo".to_owned()));
+            Utf8PathBuf::from(env::var("CARGO").unwrap_or("cargo".to_owned()));
 
         Self {
             verbosity,
             cwd,
             cargo_exe,
-            _override_manifest_path: override_manifest_path,
+            _override_manifest_path: override_manifest_path
+                .map(Utf8PathBuf::from),
             _project_paths: Default::default(),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
@@ -188,45 +190,44 @@ impl GlobalCtx {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive] // <- require use of constructors
 pub struct ProjectPaths {
-    pub manifest_dir: PathBuf,
-    pub template_dir: PathBuf,
-    pub cargo_dot_toml: PathBuf,
-    pub script_dir: PathBuf,
+    pub manifest_dir: Utf8PathBuf,
+    pub template_dir: Utf8PathBuf,
+    pub cargo_dot_toml: Utf8PathBuf,
+    pub script_dir: Utf8PathBuf,
 }
 
 impl ProjectPaths {
     // ───── Constructors ───────────────────────────────────────────── //
 
     /// Find path to the project based on user's explicit input
-    pub fn from_input_path(input_str: &str) -> crate::Result<Self> {
-        let input_path: PathBuf = input_str.into();
-
+    pub fn from_input_path(input_path: &Utf8Path) -> crate::Result<Self> {
         let normalized_path = if input_path.is_file()
-            && input_path.file_name() == Some(OsStr::new("Cargo.toml"))
+            && input_path.file_name() == Some("Cargo.toml")
         {
             input_path.parent().unwrap()
         } else {
-            &input_path
+            input_path
         };
 
         Self::from_manifest_dir(normalized_path)
     }
 
     /// Try to figure out which project path the user wants, based on env vars and CWD.
-    pub fn discover(cwd: &Path) -> crate::Result<Self> {
-        if let Ok(path) = _getenv::<PathBuf>(CARGO_PLAYGROUND_MANIFEST_DIR) {
-            return Self::from_manifest_dir(&PathBuf::from(path));
+    pub fn discover(cwd: &Utf8Path) -> crate::Result<Self> {
+        if let Ok(path) = _getenv::<Utf8PathBuf>(CARGO_PLAYGROUND_MANIFEST_DIR)
+        {
+            return Self::from_manifest_dir(&path);
         }
 
         #[cfg(feature = "xtask")]
-        if let Ok(xtask_dir) = _getenv::<PathBuf>(ENV_XTASK_MANIFEST_PATH)
+        if let Ok(xtask_dir) = _getenv::<Utf8PathBuf>(ENV_XTASK_MANIFEST_PATH)
             && let Ok(path) = _first_parent_dir_with_a_manifest_in_it(
                 xtask_dir
                     .parent()
                     .expect("`CARGO_MANIFEST_DIR` parent exists"),
             )
         {
-            return Self::from_manifest_dir(&PathBuf::from(path));
+            return Self::from_manifest_dir(&path);
         }
 
         _first_parent_dir_with_a_manifest_in_it(cwd)
@@ -235,13 +236,13 @@ impl ProjectPaths {
 
     /// Construct project paths from the path to the manifest dir, ensuring
     /// that it really is a readable directory.
-    pub fn from_manifest_dir(path: &Path) -> crate::Result<Self> {
+    pub fn from_manifest_dir(path: &Utf8Path) -> crate::Result<Self> {
         if path.is_dir() {
             // They passed a directory, we're gtg
             Ok(Self::_from_manifest_dir_path_unchecked(path.to_owned()))
         } else if !path.exists() {
             Err(crate::Error::FileErr {
-                path: path.to_string_lossy().into(),
+                path: path.to_owned(),
                 description: "provided manifest path does not exist".to_owned(),
             })
         } else {
@@ -249,12 +250,12 @@ impl ProjectPaths {
                 description: "provided manifest path is not a directory or \
                               manifest file"
                     .to_owned(),
-                path: path.to_string_lossy().into(),
+                path: path.to_owned(),
             })
         }
     }
 
-    fn _from_manifest_dir_path_unchecked(path: PathBuf) -> Self {
+    fn _from_manifest_dir_path_unchecked(path: Utf8PathBuf) -> Self {
         Self {
             cargo_dot_toml: path.join("Cargo.toml"),
             template_dir: path.join("templates"),
@@ -264,23 +265,19 @@ impl ProjectPaths {
     }
 
     // ───── Path getters ───────────────────────────────────────────── //
-
     /// Return path to a template of the given name.
     /// Note that this always succeeds - it does not check whether the
     /// file actually exists or not.
-    pub fn template_path(&self, name: &str) -> PathBuf {
+    pub fn template_path(&self, name: &str) -> Utf8PathBuf {
         self.template_dir.join(format!("{name}.rs.template"))
     }
 
     // ───── Formatting helpers ─────────────────────────────────────── //
     /// Format a path relative to the root of the project
-    pub fn relpath_project_root<'a>(
-        &'_ self,
-        path: &'a Path,
-    ) -> std::path::Display<'a> {
+    pub fn relpath_project_root(&self, path: &Utf8Path) -> Utf8PathBuf {
         path.strip_prefix(&self.manifest_dir)
             .unwrap_or(path)
-            .display()
+            .to_owned()
     }
 
     // ───── Directory traversel ────────────────────────────────────── //
@@ -295,7 +292,7 @@ impl ProjectPaths {
             crate::ioerr!(
                 ioerr,
                 "Could not access template dir: {}",
-                self.template_dir.to_string_lossy()
+                self.template_dir
             )
         })?;
 
@@ -312,11 +309,10 @@ impl ProjectPaths {
                     .map(|ftype| ftype.is_file())
                     .unwrap_or(false)
             })
-            .map(|entry| entry.path())
+            .filter_map(|entry| Utf8PathBuf::try_from(entry.path()).ok())
             .filter_map(|path| {
                 // yield templates with the extension ".rs.template"
                 path.file_name()
-                    .map(OsStr::to_string_lossy)
                     .and_then(|fname| {
                         fname.strip_suffix(".rs.template").map(str::to_owned)
                     })
@@ -333,8 +329,8 @@ const MANIFEST_MAX_SEARCH_DEPTH: u8 = 5;
 /// This does not do anything related to workspaces or whatever,
 /// and really only works for the playground model.
 fn _first_parent_dir_with_a_manifest_in_it(
-    starting_dir: &Path,
-) -> crate::Result<PathBuf> {
+    starting_dir: &Utf8Path,
+) -> crate::Result<Utf8PathBuf> {
     let mut dir = starting_dir;
     for _ in 0..MANIFEST_MAX_SEARCH_DEPTH {
         if dir.join("Cargo.toml").is_file() {
@@ -371,7 +367,7 @@ mod tests {
             verbosity: Debug,
             cwd: "/tmp".into(),
             cargo_exe: "cargo".into(),
-            _override_manifest_path: Some("/tmp/project".to_owned()),
+            _override_manifest_path: Some(Utf8PathBuf::from("/tmp/project")),
             _project_paths: Default::default(),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
@@ -385,7 +381,7 @@ mod tests {
         let paths = ctx.project_paths().unwrap();
         assert_eq!(
             paths.template_path("hyvat"),
-            PathBuf::from("/tmp/project/templates")
+            Utf8PathBuf::from("/tmp/project/templates")
         );
     }
 }
