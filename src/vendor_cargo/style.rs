@@ -1,7 +1,8 @@
 #![allow(unused)]
-/// Taken directly from cargo,
-/// https://github.com/rust-lang/cargo/blob/a357df4/crates/cargo-util-terminal/src/style.rs#L4
-/// MIT license.
+/// Vendored from cargo project, all code is copyright its respective authors.
+/// Used under MIT license, see NOTICES.md.
+/// Source:
+/// https://github.com/rust-lang/cargo/blob/710cce58b/crates/cargo-util-terminal/src/style.rs
 use anstyle::*;
 
 pub const NOP: Style = Style::new();

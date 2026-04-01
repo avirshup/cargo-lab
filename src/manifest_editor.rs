@@ -1,65 +1,84 @@
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use all_the_errors::CollectAllTheErrors;
-use toml_edit::{Array, ArrayOfTables, Item, Table, Value};
+use serde::Deserialize;
+use serde::de::IntoDeserializer;
+use toml_edit::{Array, ArrayOfTables, Item, Table, TableLike, Value};
 
-use crate::data;
-use crate::data::{MISSING, ScriptEntry};
+use crate::manifest_data::ManifestData;
+use crate::{data, util};
 
-pub struct CargoDotToml(toml_edit::DocumentMut);
+/// In-memory, editable representation of Cargo.toml via [`toml_edit`]
+pub struct ManifestEditor {
+    doc: toml_edit::DocumentMut,
+}
 
-impl CargoDotToml {
+impl ManifestEditor {
     // ───── Constructors ─────
-    pub fn read(path: &Path) -> crate::Result<Self> {
-        let toml_content = fs::read_to_string(path).map_err(|ioerr| {
-            crate::Error::IoFail(
-                format!("Failed to read '{}'", path.to_string_lossy()),
-                ioerr,
-            )
+
+    #[allow(unused)] // generally replaced by ConfigLoader
+    pub fn read(path: PathBuf) -> crate::Result<Self> {
+        let toml_content = fs::read_to_string(&path).map_err(|ioerr| {
+            crate::ioerr!(ioerr, "Failed to read '{}'", path.to_string_lossy())
         })?;
         let doc = toml_content.parse::<toml_edit::DocumentMut>()?;
-        Ok(Self(doc))
+        Ok(Self { doc })
     }
 
-    #[allow(unused)] // for testing mostly
     pub fn from_string(content: &str) -> crate::Result<Self> {
         let doc = content.parse::<toml_edit::DocumentMut>()?;
-        Ok(Self(doc))
+        Ok(Self { doc })
     }
 
     // ───── Renderers ─────
-    #[allow(unused)] // for testing mostly
     pub fn render(&self) -> String {
-        self.0.to_string()
+        self.doc.to_string()
     }
 
     pub fn write(&self, target: &Path) -> crate::Result<()> {
-        fs::write(target, self.0.to_string()).map_err(|ioerr| {
-            crate::Error::IoFail(
-                format!("Failed to write to {}", target.to_string_lossy()),
+        fs::write(target, self.render()).map_err(|ioerr| {
+            crate::ioerr!(
                 ioerr,
+                "Failed to write to {}",
+                target.to_string_lossy()
             )
         })?;
         Ok(())
     }
 
-    // ───── Queries ─────
-    pub fn get_script(&self, input_name: &str) -> Option<ScriptEntry<'_>> {
-        let canon_name = _canonicalize_name(input_name);
-
-        self.list_scripts()?
-            .find(|entry| _canonicalize_name(entry.name) == canon_name)
+    /// reify the current state of this editable document into a concrete data object
+    /// (unlike `GlobalCtx.manifest_data()`, which deserializes the string that was read from disk)
+    ///
+    /// (currently just used for testing)
+    #[allow(unused)]
+    pub fn deserialize(&self) -> crate::Result<ManifestData> {
+        let deserializer = self.doc.clone().into_deserializer();
+        let result = ManifestData::deserialize(deserializer)?;
+        Ok(result)
     }
 
-    pub fn list_scripts(
+    // ───── Queries ─────
+    // TODO: these are probably not necessary anymore - just use the serde
+    //   deserializer for this. They are still useful for testing tho
+    #[allow(unused)]
+    pub fn get_script(&self, input_name: &str) -> Option<data::ScriptEntry> {
+        let canon_name = util::canonicalize_crate_name(input_name);
+
+        self.iter_scripts()?.find(|entry| {
+            util::canonicalize_crate_name(&entry.name) == canon_name
+        })
+    }
+
+    #[allow(unused)]
+    pub fn iter_scripts(
         &self,
-    ) -> Option<impl Iterator<Item = ScriptEntry<'_>>> {
-        self.0
-            .get("bin")?
-            .as_array_of_tables()
-            .map(|arr| arr.iter().map(Self::table_to_script_entry))
+    ) -> Option<impl Iterator<Item = data::ScriptEntry>> {
+        self.doc.get("bin")?.as_array_of_tables().map(|arr| {
+            arr.iter()
+                .filter_map(|table| Self::_table_to_script_entry(table).ok())
+        })
     }
 
     // ───── Mutators ─────
@@ -70,7 +89,7 @@ impl CargoDotToml {
     ) -> crate::Result<()> {
         // ───── Part 1: insert bin array ───────────────────────────────── //
         // get or create top-level `[[bin]]` array
-        let bin_array = self.0["bin"]
+        let bin_array = self.doc["bin"]
             .or_insert(ArrayOfTables::new().into())
             .as_array_of_tables_mut()
             .ok_or_else(|| {
@@ -136,12 +155,12 @@ impl CargoDotToml {
     ) -> crate::Result<()> {
         // ───── Part 1: figure out what we're adding ─────
         let dep_strs = dep_requests.iter().map(|dep| {
-            self.normalize_dep_name(&dep.depname).map(str::to_owned)
+            self._normalize_dep_name(&dep.depname).map(str::to_owned)
         });
 
         let feature_activation_strs =
             feature_requests.iter().map(|feature_req| {
-                self.normalize_dep_name(&feature_req.depname)
+                self._normalize_dep_name(&feature_req.depname)
                     .map(|dep| format!("{}/{}", dep, feature_req.featurename))
             });
 
@@ -152,7 +171,7 @@ impl CargoDotToml {
 
         // ───── part 2: add it ─────
         let bin_entry =
-            self.get_bin_entry_mut(input_script_name).ok_or_else(|| {
+            self._get_bin_entry_mut(input_script_name).ok_or_else(|| {
                 crate::Error::ScriptNotFound(input_script_name.to_owned())
             })?;
 
@@ -173,8 +192,8 @@ impl CargoDotToml {
     }
 
     // ───── internal helpers ───────────────────────────────────────── //
-    fn normalize_dep_name(&self, input_name: &str) -> crate::Result<&str> {
-        self.find_dep_name(input_name).ok_or_else(|| {
+    fn _normalize_dep_name(&self, input_name: &str) -> crate::Result<&str> {
+        self._find_dep_name(input_name).ok_or_else(|| {
             crate::Error::DependencyNotFound((*input_name).to_owned())
         })
     }
@@ -182,28 +201,29 @@ impl CargoDotToml {
     /// Find a script matching the input name
     /// To match `cargo` behavior, this is case- and
     /// undescore/hyphen-insensitive
-    fn find_dep_name(&self, input_dep_name: &str) -> Option<&str> {
-        let canonicalized_input = _canonicalize_name(input_dep_name);
-        let dep_table = self.0.get("dependencies")?.as_table_like()?;
+    fn _find_dep_name(&self, input_dep_name: &str) -> Option<&str> {
+        let canonicalized_input = util::canonicalize_crate_name(input_dep_name);
+        let dep_table = self.doc.get("dependencies")?.as_table_like()?;
 
-        dep_table
-            .iter()
-            .map(|(k, _v)| k)
-            .find(|key| _canonicalize_name(key) == canonicalized_input)
+        dep_table.iter().map(|(k, _v)| k).find(|key| {
+            util::canonicalize_crate_name(key) == canonicalized_input
+        })
     }
 
     /// Find a script matching the input name.
     /// Similar to cargo's package-matching behavior, this is case- and
     /// undescore/hyphen-insensitive
-    fn get_bin_entry_mut(&mut self, input_name: &str) -> Option<&mut Table> {
-        let bin_array = self.0.get_mut("bin")?.as_array_of_tables_mut()?;
-        let canonicalized_input = _canonicalize_name(input_name);
+    fn _get_bin_entry_mut(&mut self, input_name: &str) -> Option<&mut Table> {
+        let bin_array = self.doc.get_mut("bin")?.as_array_of_tables_mut()?;
+        let canonicalized_input = util::canonicalize_crate_name(input_name);
 
         bin_array.iter_mut().find(|table| {
             table
                 .get("name")
                 .and_then(Item::as_str)
-                .map(|name| _canonicalize_name(name) == canonicalized_input)
+                .map(|name| {
+                    util::canonicalize_crate_name(name) == canonicalized_input
+                })
                 .unwrap_or(false)
         })
     }
@@ -211,7 +231,7 @@ impl CargoDotToml {
     // pub fn find_bin_name(&self, input_name: &str) -> Option<&str> {
     //     let canonicalized_input = _canonicalize_name(input_name);
     //
-    //     self.0
+    //     self.doc
     //         .get("bin")?
     //         .as_array_of_tables()?
     //         .iter()
@@ -220,28 +240,62 @@ impl CargoDotToml {
     //         .find(|realname| _canonicalize_name(realname) == canonicalized_input)
     // }
 
-    fn table_to_script_entry(table: &Table) -> ScriptEntry<'_> {
-        ScriptEntry {
-            name: table.get("name").and_then(Item::as_str).unwrap_or(MISSING),
-            path: table.get("path").and_then(Item::as_str).unwrap_or(MISSING),
+    // fn _table_to_metadata<'de, T>(
+    //     table: &'de T,
+    // ) -> crate::Result<data::PlaygroundMetadata<'de>>
+    // where
+    //     T: TableLike + IntoDeserializer<'de>,
+    // {
+    //     data::PlaygroundMetadata::deserialize(table.into_deserializer())
+    //         .map_err(crate::Error::from_serde_err)
+    // }
+
+    fn _get_str_value<'src>(
+        table: &'src impl TableLike,
+        key: &'static str,
+        err_place: &'static str,
+    ) -> crate::Result<&'src str> {
+        table
+            .get(key)
+            .ok_or_else(|| {
+                crate::Error::ManifestCorrupt(format!(
+                    "{err_place} is missing required key '{key}'"
+                ))
+            })?
+            .as_str()
+            .ok_or_else(|| {
+                crate::Error::ManifestCorrupt(format!(
+                    "In, {err_place} '{key}' must be a string"
+                ))
+            })
+    }
+
+    fn _table_to_script_entry(
+        table: &Table,
+    ) -> crate::Result<data::ScriptEntry> {
+        let name =
+            Self::_get_str_value(table, "name", "[[bin]] entry")?.to_owned();
+        let path =
+            Self::_get_str_value(table, "path", "[[bin]] entry")?.to_owned();
+
+        let result = data::ScriptEntry {
+            name,
+            path,
             required_features: table
                 .get("required-features")
                 .and_then(Item::as_array)
                 .map(|array| {
                     array
-                        .iter() // MAYBE: maybe don't ignore non-string items? (i.e., errors)
+                        .iter()
                         .filter_map(Value::as_str)
-                        .collect::<Vec<&str>>()
+                        .map(str::to_owned)
+                        .collect::<Vec<String>>()
                 })
                 .unwrap_or(vec![]),
-        }
-    }
-}
+        };
 
-/// Canonicalize a name for matching purposes
-/// (i.e., 2 names "match" if they both canonicalize to the same string)
-fn _canonicalize_name(s: &str) -> String {
-    s.to_lowercase().replace('-', "_")
+        Ok(result)
+    }
 }
 
 fn _add_unique_strings_to_array(
@@ -275,11 +329,11 @@ path = "src/my_script.rs"
 required-features = ["hi", "hi/there"]
 "#;
 
-        let doc = CargoDotToml::from_string(TOML).unwrap();
-        let expected = Some(ScriptEntry {
-            name: "my-script",
-            path: "src/my_script.rs",
-            required_features: vec![],
+        let doc = ManifestEditor::from_string(TOML).unwrap();
+        let expected = Some(data::ScriptEntry {
+            name: "my-script".to_owned(),
+            path: "src/my_script.rs".to_owned(),
+            required_features: vec!["hi".to_owned(), "hi/there".to_owned()],
         });
 
         for name in ["my-script", "My_ScriPt"] {
@@ -296,7 +350,7 @@ edition = "252525"  # now this song is going through your head
 
 [dependencies]
 "#;
-        let mut doc = CargoDotToml::from_string(TOML).unwrap();
+        let mut doc = ManifestEditor::from_string(TOML).unwrap();
         doc.add_new_bin("do-thing", "do_thing.rs").unwrap();
         let actual = doc.render();
         let expected = r#"
@@ -312,21 +366,6 @@ required-features = []
 "#;
 
         assert_eq!(actual, expected);
-    }
-
-    fn depreq(dep: &str) -> data::DepRequest {
-        data::DepRequest {
-            depname: dep.to_owned(),
-            version: None,
-            input_string: "whatever".to_owned(),
-        }
-    }
-
-    fn featurereq(dep: &str, feature: &str) -> data::FeatureRequest {
-        data::FeatureRequest {
-            depname: dep.to_owned(),
-            featurename: feature.to_owned(),
-        }
     }
 
     #[test]
@@ -350,14 +389,18 @@ path = "src/s2.rs"
 required-features = ["d2", "something"]
 "#;
 
-        let mut doc = CargoDotToml::from_string(TOML).unwrap();
+        let mut doc = ManifestEditor::from_string(TOML).unwrap();
 
-        doc.activate_features("s1", &[depreq("d1")], &[featurereq("d2", "f2")])
-            .unwrap();
+        doc.activate_features(
+            "s1",
+            &[_depreq("d1")],
+            &[_featurereq("d2", "f2")],
+        )
+        .unwrap();
         doc.activate_features(
             "s2",
-            &[depreq("d1"), depreq("d2")],
-            &[featurereq("d1", "f1"), featurereq("d2", "f2")],
+            &[_depreq("d1"), _depreq("d2")],
+            &[_featurereq("d1", "f1"), _featurereq("d2", "f2")],
         )
         .unwrap();
 
@@ -382,5 +425,21 @@ path = "src/s2.rs"
 required-features = ["d2", "something", "d1", "d1/f1", "d2/f2"]
 "#;
         assert_eq!(actual, expected);
+    }
+
+    // ───── test helpers ───────────────────────────────────────────── //
+    fn _depreq(dep: &str) -> data::DepRequest {
+        data::DepRequest {
+            depname: dep.to_owned(),
+            version: None,
+            input_string: "whatever".to_owned(),
+        }
+    }
+
+    fn _featurereq(dep: &str, feature: &str) -> data::FeatureRequest {
+        data::FeatureRequest {
+            depname: dep.to_owned(),
+            featurename: feature.to_owned(),
+        }
     }
 }

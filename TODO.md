@@ -42,6 +42,18 @@
 
 - [ ] passing arguments to script via `cargo playground run` is not working yet
 
+### Cargo script support
+
+- [ ] Parse it the same way as cargo's (unstable) implementation
+    - important modules seem to be [
+      `..::util::toml::embedded`](https://github.com/rust-lang/cargo/blob/0f14d9d2fa4c/src/cargo/util/toml/embedded.rs) and
+      [
+      `..::util::frontmatter`](https://github.com/rust-lang/cargo/blob/0f14d9d2fa4c/src/cargo/util/frontmatter.rs) ... it uses a whole-ass parser-combinator
+      library called "winnow" (although the initial implementation just used regexes,
+      which is probably not really ok for the usual reasons).
+    - `winnow` is maintained by a maintainer of cargo itself so it's still high trust
+      (also it's a fork of `nom` apparently?)
+
 ## usage as `cargo playground`
 
 - [ ] require enabling "metadata.playground" flag in Cargo.toml
@@ -74,7 +86,7 @@
 - [ ] Parse `-F/--feature` the same way as cargo (i.e., allow for multiple
   space-comma separated features in a single argument)
 - [ ] 
-  `cargo script` support - manage an ["embedded manifest"](https://rust-lang.github.io/rfcs/3424-cargo-script.html) and keep it
+  `cargo script` support - manage an ["embedded manifest"](https://rust-lang.github.io/rfcs/3502-cargo-script.html) and keep it
   in sync w/ our `Cargo.toml`
 - [ ] use styles from `cli_style` for output everywhere
 - [ ]  `cargo playground init` -

@@ -1,42 +1,67 @@
 use std::path::PathBuf;
 
-pub const MISSING: &str = "<MISSING>";
-
-// ───── "Requests" from the user ───────────────────────────────── //
-/// A dependency's feature.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FeatureRequest {
-    pub depname: String,
-    pub featurename: String,
+derive_alias! {
+    #[derive(PlainData!)] = #[derive(Clone, Debug, PartialEq, Eq)];
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+// ───── Requests from the user ─────────────────────────────────── //
+/// A request to add dependencies and activate dependency features
+/// for a given script.
+///
+/// Like all other requests, this represents user input and so
+/// all of the strings should be canonicalized/normalized to
+/// the extent possible.
+#[derive(PlainData!)]
+pub struct ScriptRequest {
+    pub script: String,
+    pub deps: Vec<DepRequest>,
+    pub features: Vec<FeatureRequest>,
+    pub cargo_args: Vec<String>,
+}
+
+/// A request to add a dependency.
+///
+/// Like all other requests, this represents user input and so
+/// all of the strings should be canonicalized/normalized to
+/// the extent possible.
+#[derive(PlainData!)]
 pub struct DepRequest {
     pub depname: String,
     pub version: Option<String>,
     pub input_string: String,
 }
 
-// ───── Data from cargo.toml ───────────────────────────────────── //
-// /// A dependency's feature.
-// #[derive(Clone, Debug, PartialEq, Eq)]
-// pub struct DepFeature {
-//     pub depname: String,
-//     pub featurename: String,
-// }
+/// A request to activate a feature of dependency
+///
+/// Like all other requests, this represents user input and so
+/// all of the strings should be canonicalized/normalized to
+/// the extent possible.
+#[derive(PlainData!)]
+pub struct FeatureRequest {
+    pub depname: String,
+    pub featurename: String,
+}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+// ───── Data from cargo.toml ───────────────────────────────────── //
+/// Metadata from `[package.metadata.cargo-playground]`
+#[derive(PlainData!)]
+pub struct PlaygroundMetadata {
+    pub enabled: bool,
+    pub editable: bool,
+    pub editor_cmd: Option<String>,
+}
+
+/// A playground script (aka a `[[bin]]` table) in Cargo.toml.
+#[derive(PlainData!)]
+pub struct ScriptEntry {
+    pub name: String,
+    pub path: String,
+    pub required_features: Vec<String>,
+}
+
+/// A template from the playground's templates directory
+#[derive(PlainData!)]
 pub struct ScriptTemplate {
     pub name: String,
     pub path: PathBuf,
-}
-
-/// A script (aka a `[[bin]]` table) in Cargo.toml.
-/// If the `name` or `path` is missing, they will
-/// have the value "<MISSING>".
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ScriptEntry<'a> {
-    pub name: &'a str,
-    pub path: &'a str,
-    pub required_features: Vec<&'a str>,
 }
