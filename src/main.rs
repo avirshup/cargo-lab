@@ -8,19 +8,22 @@ mod global_ctx;
 mod manifest_data;
 mod manifest_editor;
 mod ops;
+mod random_names;
+mod script_name_newtype;
 mod util;
-
-#[cfg(feature = "experimental_cargo_script_rfc3502")]
-mod cargo_script;
 
 // lints / formatting disabled for vendored code
 #[rustfmt::skip]
 #[allow(clippy::all, unused)]
 mod vendor_cargo;
-mod random_names;
-mod script_name_newtype;
 
-use std::io;
+#[cfg(feature = "experimental_cargo_script_rfc3502")]
+mod cargo_script;
+mod project_checker;
+mod templates;
+
+use std::process::ExitCode;
+use std::{env, io};
 
 use color_print::ceprintln;
 
@@ -28,13 +31,18 @@ use crate::cli::GeneratesArgs;
 use crate::errors::{Error, Result};
 use crate::global_ctx::GlobalCtx;
 
-fn main() -> Result<()> {
-    // if `$COMPLETE` env var is set, this will never return,
-    // otherwise it's (more or less) a no-op
-    cli::maybe_exec_dynamic_automcomplete();
+fn main() -> ExitCode {
+    // under many circumstances this call will never return!
+    // e.g., if autcomplete mode was requested, or `--help` was
+    // passed, or args weren't parseable, etc etc.
+    let args = cli::autocomplete_or_parse_args();
 
-    let args = cli::parse_argv();
-    run(args)
+    if let Err(err) = run(args) {
+        ceprintln!("<red>error</red>: {err}");
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 /// Interpret and validate CLI args, then try to fulfill the request
@@ -55,12 +63,13 @@ fn run(args: cli::MainCli) -> Result<()> {
         (false, _more_than_1) => global_ctx::Debug,
     };
 
-    let ctx = GlobalCtx::new(verbosity, args.global_args.manifest_path.clone());
-
-    if ctx.verbosity >= global_ctx::Debug {
-        println!("Args: {args:#?}");
+    if verbosity >= global_ctx::Debug {
+        eprintln!("ARGV: {:?}", env::args());
+        eprintln!("env vars: {:?}", env::vars());
+        eprintln!("Parsed args: {args:#?}");
     }
 
+    let ctx = GlobalCtx::new(verbosity, args.global_args.manifest_path.clone());
     match args.cmd {
         cli::SubCmd::InitPlayground(cli::InitPlayground {
             path: path_str,
@@ -114,25 +123,11 @@ fn run(args: cli::MainCli) -> Result<()> {
         },
 
         cli::SubCmd::RenameScript(cli::RenameScript {
-            script_name,
-            name,
-            path,
+            old_name: script_name,
+            new_name,
             edit,
         }) => {
-            if name.is_none() && path.is_none() {
-                return Err(Error::CliArgParseFail(
-                    "At least one of '--name' or '--path' must be specified"
-                        .to_owned(),
-                ));
-            }
-
-            ops::rename_script(
-                &script_name,
-                name.as_deref(),
-                path.as_deref(),
-                edit,
-                ctx,
-            )?;
+            ops::rename_script(&script_name, &new_name, edit, ctx)?;
         },
 
         cli::SubCmd::ListScripts => {
@@ -166,7 +161,9 @@ fn run(args: cli::MainCli) -> Result<()> {
         },
 
         // mostly for debugging/testing. (should be hidden from CLI help)
-        cli::SubCmd::DoNothing => (),
+        cli::SubCmd::Check => {
+            project_checker::check_config(ctx)?;
+        },
     };
 
     Ok(())

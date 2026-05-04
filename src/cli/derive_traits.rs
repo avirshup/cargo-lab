@@ -49,7 +49,7 @@ pub trait GeneratesArgs {
 /// (or really 2 to make it testable) for the proc macro.
 ///
 /// This could also just be done at runtime with an array of
-/// strings and a build-style clap CLI)
+/// strings and a build-style clap CLI
 #[macro_export]
 macro_rules! build_passthrough_long_args {
     (

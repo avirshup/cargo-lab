@@ -1,6 +1,6 @@
 use camino::Utf8PathBuf;
 use clap::builder::Styles;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Command, Parser, Subcommand};
 
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
@@ -16,7 +16,7 @@ attribute_alias! {
    #[apply(DeriveArg)] = #[derive(Clone, Debug)];
 }
 
-const STYLES: Styles = Styles::styled()
+pub(super) const STYLES: Styles = Styles::styled()
     .header(style::HEADER)
     .usage(style::USAGE)
     .literal(style::LITERAL)
@@ -104,16 +104,16 @@ pub enum SubCmd {
     #[command(name = "edit")]
     EditScript(EditScript),
 
-    /// Shell autocompletions
+    /// Print CLI completion commands to stdout.
     #[command(
         name = "completions",
-        long_about = "Print shell autocompletion script to stdout."
+        defer=WriteCompletionScript::add_after_help_examples,
     )]
     WriteCompletionScript(WriteCompletionScript),
 
-    /// For debugging, hidden from output
-    #[command(name = "do-nothing", hide = true)]
-    DoNothing,
+    /// Check configuration
+    #[command(name = "check")]
+    Check,
 }
 
 // ──────────────────────────────────────────────────────────────────────── //
@@ -202,15 +202,10 @@ pub struct NewScriptOpts {
 pub struct RenameScript {
     /// Name of the script to be renamed
     #[arg(value_name = "SCRIPT", add = script_name_completer())]
-    pub script_name: String,
+    pub old_name: String,
 
     /// New script name
-    #[arg(long, short)]
-    pub name: Option<String>,
-
-    /// New filename for this script
-    #[arg(long, short)]
-    pub path: Option<Utf8PathBuf>,
+    pub new_name: String,
 
     /// Open the script in editor after this operation.
     ///
@@ -272,9 +267,7 @@ pub struct EditScript {
     pub editor_cmd: Option<Vec<String>>,
 }
 
-/// Print CLI completion script to stdout.
-///
-/// TODO: instructions on how to install / activate
+/// Print CLI completion commands to stdout.
 #[apply(DeriveArg)]
 #[derive(Args)]
 pub struct WriteCompletionScript {
@@ -283,6 +276,30 @@ pub struct WriteCompletionScript {
     /// Shell name ('bash' / 'fish' / etc.)
     #[arg()]
     pub shell: String,
+}
+
+impl WriteCompletionScript {
+    /// Dynamically generates long help text for this command.
+    ///
+    /// This is necessary because we want to provide example
+    /// commands, so need to know exactly how the command was invoked.
+    ///
+    /// (If this needs to be done more than once, could also use
+    /// a more general mechanism to expand placeholders
+    /// within use a regex or something to expand a placeholder
+    /// within the docstrings?)
+    fn add_after_help_examples(cmd: Command) -> Command {
+        let invocation = cmd.get_bin_name().unwrap_or("cargo-playground");
+
+        let helpstr = format!(
+            r#"
+To activate the command line completions for the current session, run
+   $ {invocation} completions $shellname | source
+"#
+        );
+
+        cmd.after_help(helpstr)
+    }
 }
 
 #[apply(DeriveArg)]
@@ -300,7 +317,7 @@ missing dependencies will be installed with `cargo add`",
 
     #[arg(
         short = 'F',
-        long = "feature",
+        long = "features",
         help="Dependency features to activate",
         long_help = "Dependency-qualified features to activate, \
 of the form `[DEPNAME/](FEATURENAME)`, e.g., \"somecrate/somefeature\".

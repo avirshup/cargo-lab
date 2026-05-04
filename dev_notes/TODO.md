@@ -1,6 +1,6 @@
 # TODO:
 
-- [ ] ~~Prime directive~~ Main usability goal:
+- [x] (sufficiently done) ~~Prime directive~~ Main usability goal:
   UX "as fast" / "as ergonomic" to use as going to https://play.rust-lang.org/
   in your browser ... qualitatively and within reason, subject to the limitations of:
     - user's chosen IDE, and
@@ -58,9 +58,21 @@
       with proper dependencies (and a `use` at the top? no, we don't actually
       know the crate name)
     - [x] ~~opens API docs in browser?~~ nah
-- [ ] finish splitting this into its own repo
+
+## Misc task
+
+- [x] finish splitting this into its own repo
 - [ ] lifecycle test
     - init a repo, add templates, create scripts, add dependencies, run scripts
+- [ ] more fun w/ autocompletion:
+    - [ ] "global" arguments are suggested w/ base "cargo" cmd, that ain't right
+        - WHY? because `cargo playground generate` generates completions for bare
+          `cargo` itself I guess?
+    - [ ] don't suggest flags unless current arg starts with a '-' maybe?
+        - this is what clap's stable (static) completion implementation does
+    - [ ] what is right way to install this in fish that doesn't conflict w/
+      cargo itself?
+- [ ] test use with cargo alias
 
 ## Functionality
 
@@ -70,6 +82,8 @@
 
 - [x] passing arguments to script via
   `cargo playground run $scriptname -- $args`
+- [ ] `cargo play[tab]` does not autocomplete even though
+  `cargo playground [args] [tab]` does
 - [ ] passing arguments to script via `cargo playground run $scriptname $args`?
     - is there equivalent of `parse_known_args()` or something?
 
@@ -141,8 +155,8 @@
 - [ ]  `cargo playground init` -
   to create a whole-ass new project or enable metadata on existing one
     - [ ] optionally initialize as xtask? (i.e., add this code to the workspace?)
-- [ ] `cargo playground rename`
-- [ ] `cargo playground copy'
+- [x] `cargo playground rename`
+- [ ] `cargo playground copy`
 - [ ] `cpg template`: list (modify/create?) available
   **templates**, + tell user where stored, how to modify
 - [ ] **Version conflicts**: what happens if `cpg new script1 dep@0.1.2` then
@@ -161,7 +175,7 @@
 - [x] `cpg new`: allow specifying deps at same time as creating new script
 - [ ] `Arguments for cargo add` section has too much whitespace
 - [ ] include `cargo add`'s changes to dependencies when we run `diff`
-- [ ] Don't say "Updated Cargo.toml" updated if nothing changed
+- [ ] Don't say "Updated Cargo.toml" if nothing changed
 - [x] Don't run cargo add if no deps will change
 
 #### Pedantic correctness
@@ -169,7 +183,7 @@
 These are about correctness, including cases even if manifest is manually edited.
 These are "pedantic" if they're low likelihood or just Not A Big Deal if they happen.
 
-- [ ] validate script names and filenames in `cpg new`
+- [x] validate script names and filenames in `cpg new`
 - [ ] Cargo.toml race conditions / TOCTOU / cargo locking
   (rn we are assuming user is not doing 10 things at once.
   "AI" agents might do this but I don't care about them.)

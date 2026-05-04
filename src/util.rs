@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::{fs, process};
 
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 use color_print::ceprintln;
 
 /// A rough attempt to print the subprocess invocations we're about to run.
@@ -62,48 +62,61 @@ pub fn join_str_iter<'a, 'b>(
 
 // ───── String rectification ───────────────────────────────────── //
 
+/// `cmd_suffix("/path/to/cargo-thing.exe")` produces `Some("thing")`
+///
+/// Q: what if it's called "cargo-playground.old.exe" huh? what then hotshot?
+/// A: In this case, cargo won't run it as a subocmmand
+/// (`cargo playground.old` doesn't work), so we don't have to handle
+/// this case.
+pub fn cargo_cmd_suffix(exe_path: &Utf8Path) -> Option<&str> {
+    exe_path
+        .file_stem()
+        .and_then(|stem| stem.strip_prefix("cargo-"))
+}
+
 /// Canonicalize a name for matching purposes
 /// (i.e., 2 names "match" if they both canonicalize to the same string)
 pub fn canonicalize_crate_name(s: &str) -> String {
     s.to_lowercase().replace('-', "_")
 }
-
-/// Ensure that a requested filename for a script is of the form
-/// "src/[filename].rs"
-///
-/// It will correct for the following input issues:
-///  - if ".rs" is not present it will add it
-///  - the leading "src/" will be added if not present
-pub fn normalize_script_path(
-    input_path: &Utf8Path,
-) -> crate::Result<Utf8PathBuf> {
-    let num_components = input_path.components().count();
-
-    // strip leading "src/" if present
-    let filename: &str = {
-        if num_components == 1 {
-            Ok(input_path.as_str())
-        } else if num_components == 2
-            && input_path.components().next().unwrap().as_str() == "src"
-        {
-            Ok(input_path.file_name().unwrap())
-        } else {
-            Err(crate::Error::InvalidScriptFilename(input_path.to_owned()))
-        }?
-    };
-
-    // strip trailing ".rs" if present
-    let stem = filename.strip_suffix(".rs").unwrap_or(filename);
-
-    if !stem
-        .chars()
-        .all(|c| c.is_ascii_digit() || c.is_ascii_alphabetic() || c == '_')
-    {
-        return Err(crate::Error::InvalidScriptFilename(input_path.to_owned()));
-    }
-
-    Ok(Utf8Path::new("src").join(stem).with_extension(".rs"))
-}
+//
+// /// Ensure that a requested filename for a script is of the form
+// /// "src/[filename].rs"
+// ///
+// /// It will correct for the following input issues:
+// ///  - if ".rs" is not present it will add it
+// ///  - the leading "src/" will be added if not present
+// pub fn normalize_script_path(
+//     input_path: &Utf8Path,
+// ) -> crate::Result<Utf8PathBuf> {
+//     // extract the filename from paths of the form "src/filename", if necessary
+//     // TODO: this function has hardcoded "src" thus it is business logic, not a util
+//     let filename: &str = {
+//         let mut path_part_iter = input_path.components().map(|p| p.as_str());
+//         match [
+//             path_part_iter.next(),
+//             path_part_iter.next(),
+//             path_part_iter.next(),
+//         ] {
+//             [Some("src"), Some(fname), None] => Ok(fname),
+//             [Some(fname), None, None] => Ok(fname),
+//             _otherwise =>
+//                 Err(crate::Error::InvalidScriptFilename(input_path.to_owned())),
+//         }
+//     }?;
+//
+//     // strip trailing ".rs" if present
+//     let stem = filename.strip_suffix(".rs").unwrap_or(filename);
+//
+//     if !stem
+//         .chars()
+//         .all(|c| c.is_ascii_digit() || c.is_ascii_alphabetic() || c == '_')
+//     {
+//         return Err(crate::Error::InvalidScriptFilename(input_path.to_owned()));
+//     }
+//
+//     Ok(Utf8Path::new("src").join(stem).with_extension("rs"))
+// }
 
 // ───── Wrappers around stdlib with our own error handling ─────── //
 // we can't just use a From trait for these because afaict io::Error doesn't provide
@@ -158,23 +171,23 @@ pub fn create_dir(path: &Utf8Path) -> crate::Result<()> {
     })?;
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_normalize_script_path() {
-        for (input, expected) in [
-            ("hi", "src/hi.rs"),
-            ("bye.rs", "src/bye.rs"),
-            ("src/sigh", "src/sigh.rs"),
-            ("src/die.rs", "src/die.rs"),
-        ] {
-            assert_eq!(
-                normalize_script_path(input.into()).unwrap(),
-                expected.to_owned()
-            );
-        }
-    }
-}
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn test_normalize_script_path() {
+//         for (input, expected) in [
+//             ("hi", "src/hi.rs"),
+//             ("bye.rs", "src/bye.rs"),
+//             ("src/sigh", "src/sigh.rs"),
+//             ("src/die.rs", "src/die.rs"),
+//         ] {
+//             assert_eq!(
+//                 normalize_script_path(input.into()).unwrap(),
+//                 expected.to_owned()
+//             );
+//         }
+//     }
+// }
