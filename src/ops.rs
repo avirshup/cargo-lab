@@ -1,11 +1,12 @@
 use std::os::unix::process::CommandExt;
 use std::process;
 
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_print::{ceprintln, cprintln};
 
 use crate::global_ctx::{GlobalCtx, ProjectPaths};
 use crate::manifest_editor::ManifestEditor;
+use crate::templates::TEMPLATES;
 use crate::{data, global_ctx, util};
 
 pub fn init_new_playground(
@@ -42,7 +43,13 @@ pub fn init_new_playground(
         &_init_manifest_content(name, edition),
     )?;
 
-    // 3. Add the first script
+    // 3. Write builtin templates
+    for template in TEMPLATES {
+        let target = paths.template_path(template.name);
+        util::write_file(&target, template.content)?;
+    }
+
+    // 4. Add the first script
     new_script(
         &data::ScriptConfigRequest::nodeps("my-first-script".to_owned()),
         None,
@@ -111,7 +118,7 @@ pub fn new_script(
     // ───── Part 2: create new script (if it doesn't already exist) ── //
     // TODO: less TOCTOU here, use `File::create_new`?
     let paths = new_ctx.project_paths()?;
-    let src_filename = _script_name_to_filename(&request.script);
+    let src_filename = _path_from_script_name(&request.script);
     let dest = paths.manifest_dir.join(&src_filename);
     if dest.is_file() {
         ceprintln!(
@@ -124,6 +131,7 @@ pub fn new_script(
         // TODO: add a comment to the top the same as when using the builtin template
         let template_path = paths.template_path(template_name);
         util::copy_file(&template_path, &dest)?;
+        // FIXME: respect verbosity
         ceprintln!(
             "<green>success</>: Created script from template: {} -> {}",
             paths.relpath_project_root(&template_path),
@@ -132,6 +140,7 @@ pub fn new_script(
     } else {
         // no specific template requested, just use the minimal script
         util::write_file(&dest, &_init_minimial_script(&request.script))?;
+        // FIXME: respect verbosity
         ceprintln!(
             "<green>success</>: Created minimal script at: {}",
             paths.relpath_project_root(&dest)
@@ -140,7 +149,7 @@ pub fn new_script(
 
     // update the in-memory Cargo.toml
     let mut manifest_editor = new_ctx.new_editor()?;
-    manifest_editor.add_new_bin(&request.script, &src_filename)?;
+    manifest_editor.add_new_bin(&request.script, &src_filename.as_str())?;
     manifest_editor.activate_features(
         &request.script,
         &request.deps,
@@ -160,47 +169,56 @@ pub fn new_script(
 
 /// Change script's name or path
 pub fn rename_script(
-    script_name: &str,
-    maybe_new_name: Option<&str>,
-    maybe_new_path_input: Option<&Utf8Path>,
+    input_old_name: &str,
+    new_name: &str,
     then_edit: bool,
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
     let paths = ctx.project_paths()?;
     let orig_manifest = ctx.manifest_data()?;
+    let orig_script =
+        orig_manifest.get_script(input_old_name).ok_or_else(|| {
+            crate::Error::ScriptNotFound(input_old_name.to_owned())
+        })?;
 
-    let orig_script = orig_manifest
-        .get_script(script_name)
-        .ok_or_else(|| crate::Error::ScriptNotFound(script_name.to_owned()))?;
-
-    // ensure new name is unique
-    if let Some(new_name) = maybe_new_name
-        && orig_manifest.get_script(new_name).is_some()
-    {
+    // ───── Part 1: sanity checks ──────────────────────────────────── //
+    // check names
+    if orig_script.name == new_name {
+        if ctx.verbosity > global_ctx::Quiet {
+            ceprintln!(
+                "<yellow>warning</> Renaming '{new_name}' to itself (nothing \
+                 changed)"
+            );
+        }
+        return Ok(());
+    }
+    if orig_manifest.get_script(new_name).is_some() {
         return Err(crate::Error::ScriptNameConflict(new_name.to_owned()));
     }
 
-    let maybe_new_path = maybe_new_path_input
-        .map(util::normalize_script_path)
-        .transpose()?;
-
-    // ensure new path does not already exist
-    if let Some(new_name) = maybe_new_name
-        && orig_manifest.get_script(new_name).is_some()
-    {
-        return Err(crate::Error::ScriptNameConflict(new_name.to_owned()));
+    // check paths
+    let new_path = _path_from_script_name(new_name);
+    if paths.manifest_dir.join(&new_path).exists() {
+        return Err(crate::Error::FileErr {
+            path: new_path,
+            description: "Cannot rename; would overwrite existing file"
+                .to_owned(),
+        });
     }
 
-    // note we don't actually *write* these changes back until after renaming
-    // the file, so if renaming fails, no changes will have been made
+    // ───── Part 2: apply the changes ──────────────────────────────── //
+
+    // update manifest in memory
+    // (do this first so it will fail before changing anything on disk)
     let mut manifest_editor = ctx.new_editor()?;
     manifest_editor.update_bin(
         &orig_script.name,
-        maybe_new_name,
-        maybe_new_path.as_deref().map(Utf8Path::as_str),
+        Some(new_name),
+        Some(new_path.as_str()),
     )?;
 
-    if let Some(new_path) = maybe_new_path {
+    // Make changes on disk
+    if orig_script.path != new_path {
         ceprintln!(
             "<blue>mv</> <yellow>{}</> -> <green>{}</>",
             orig_script.path,
@@ -211,15 +229,12 @@ pub fn rename_script(
             &paths.manifest_dir.join(&new_path),
         )?;
     };
-
-    // update it on disk
     _update_and_show_diff(&manifest_editor, &paths.cargo_dot_toml)?;
 
-    // launch editor if requested
+    // done
     if then_edit {
         edit_script(&orig_script.name, &None, ctx.reload())?;
     }
-
     Ok(())
 }
 
@@ -337,9 +352,15 @@ pub fn edit_script(
     Ok(())
 }
 
+// ───── Project check ──────────────────────────────────────────── //
+// TODO: probably this gets its own module
+
 // ───── Helpers ────────────────────────────────────────────────── //
-fn _script_name_to_filename(bin_name: &str) -> String {
-    format!("src/{}.rs", bin_name.replace('-', "_"))
+/// Create a sensible `bin[].path` value from the script's name.
+fn _path_from_script_name(bin_name: &str) -> Utf8PathBuf {
+    Utf8Path::new("src")
+        .join(bin_name.replace('-', "_"))
+        .with_extension("rs")
 }
 
 fn _update_and_show_diff(
@@ -419,7 +440,7 @@ fn _print_script_info(
     if ctx.verbosity > global_ctx::Quiet {
         cprintln!(
             "\
-- <green>{name}</>:
+- <cyan>{name}</>:
     <blue>path:</> {path}
     <blue>dependencies:</> {required_features:?}
 "
@@ -445,7 +466,7 @@ fn main() {{
 /// Just done as plain text so we can add comments
 fn _init_manifest_content(project_name: &str, edition: &str) -> String {
     format!(
-        r#"\
+        r#"
 [package]
 name = "{project_name}"
 edition = "{edition}"

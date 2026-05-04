@@ -49,7 +49,7 @@ src:
 check:
     FROM +src
     RUN echo "Checking version $CRATE_VERSION"
-    DO rust+CARGO --args="fmt --check -v"
+    DO rust+CARGO --args="+nightly fmt --check -v"
     DO rust+CARGO --args="clippy -v"
     DO rust+CARGO --args="deny -L info check"
     RUN echo "Checked $CRATE_VERSION"

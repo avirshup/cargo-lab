@@ -360,28 +360,24 @@ where
 mod tests {
     use super::*;
 
-    fn _ctx_test() -> GlobalCtx {
-        // nb this doesn't actually create any directories on disk,
-        // paths are all made up for testing purposes
-        GlobalCtx {
-            verbosity: Debug,
-            cwd: "/tmp".into(),
-            cargo_exe: "cargo".into(),
-            _override_manifest_path: Some(Utf8PathBuf::from("/tmp/project")),
-            _project_paths: Default::default(),
-            _manifest_raw: Default::default(),
-            _manifest_data: Default::default(),
-            _playground_config: Default::default(),
-        }
-    }
-
     #[test]
     fn test_project_paths() {
-        let ctx = _ctx_test();
-        let paths = ctx.project_paths().unwrap();
+        let paths = ProjectPaths::_from_manifest_dir_path_unchecked(
+            "/tmp/project/hyvät".into(),
+        );
         assert_eq!(
-            paths.template_path("hyvat"),
-            Utf8PathBuf::from("/tmp/project/templates")
+            paths
+                .relpath_project_root("/tmp/project/hyvät/herrat".into())
+                .as_str(),
+            "herrat"
+        );
+        assert_eq!(
+            paths.template_path("ahti").as_str(),
+            "/tmp/project/hyvät/templates/ahti.rs.template"
+        );
+        assert_eq!(
+            paths.cargo_dot_toml.as_str(),
+            "/tmp/project/hyvät/Cargo.toml"
         );
     }
 }

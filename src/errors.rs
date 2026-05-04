@@ -32,7 +32,7 @@ pub enum Error {
     #[error("{0}")]
     CargoFail(String),
 
-    #[error("Path '{path}': {description})")]
+    #[error("Path '{path}': {description}")]
     FileErr {
         path: Utf8PathBuf,
         description: String,
@@ -74,9 +74,9 @@ pub enum Error {
     #[error("Script named '{0}' already exists in Cargo.toml")]
     ScriptNameConflict(String),
 
-    #[error("'{0}' is not a valid filename for a script")]
-    InvalidScriptFilename(Utf8PathBuf),
-
+    // #[error("'{0}' is not a valid filename for a script")]
+    // InvalidScriptFilename(Utf8PathBuf),
+    //
     #[error("No dependency matching '{0}' found in Cargo.toml")]
     DependencyNotFound(String),
 

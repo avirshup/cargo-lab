@@ -3,10 +3,15 @@ name = "cargo-lab"
 version = "0.0.0-unset"
 edition = "2024"
 
+[[bin]]
+name = "cargo-playground"
+path = "src/main.rs"
+
 [features]
 xtask = []  # for use as an "xtask" in a subfolder of the project root
 experimental_cargo_script_rfc3502 = ["dep:winnow"]
 
+# ───── DEPS ───────────────────────────────────────────────────── #
 [dependencies]
 all-the-errors = "0.1.1" # my crate
 
@@ -22,8 +27,22 @@ serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 winnow = { version = "1.0.1", optional = true }
 
-# Trust: very high (audit by mozilla, known / trusted authors)
+# Trust: very high (audit by mozilla, owned by core devs)
 camino = "1.2.2"
 
 # Trust: high (widely used)
 macro_rules_attribute = "0.2.2"
+
+
+# ───── DEV DEPS ───────────────────────────────────────────────── #
+[dev-dependencies]
+# Trust: very high (audit by mozilla, owned by @epage)
+assert_cmd = "2.2.1"
+
+# Trust: very high (blessed.rs)
+tempfile = "3.27.0"
+
+
+# ───── BUILD DEPS ─────────────────────────────────────────────── #
+[build-dependencies]
+camino = "1.2.2"  # same as runtime dep (could use a workspace to synchronize ...)

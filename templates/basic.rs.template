@@ -1,0 +1,7 @@
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    println!("Hello world! from the basic script template");
+
+    ExitCode::from(0)
+}
