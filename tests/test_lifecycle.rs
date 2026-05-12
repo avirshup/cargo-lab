@@ -1,21 +1,34 @@
 #![cfg(test)]
+//! End-to-end tests of the produced binaries.
+//!
+//! These tests generally have more side effects than you
+//! might expect from running `cargo test`
+//! (i.e., they download dependencies, compile and run code, etc.)
+//! so all tests here have `#[ignore]`;
+//! Run these with `cargo test -- --ignored`, or run *all* tests
+//! with `cargo test -- --include-ignored`
 
-mod helpers;
-use helpers::*;
+pub mod common;
+use common::*;
 
-const PROJECT_NAME: &str = "my_project";
-const FIRST_SCRIPT_NAME: &str = "my-first-script"; // !this is currently hardcoded in `ops` module!
-const SCRIPT2: &str = "script2";
-const TRY_CLAP_SCRIPT: &str = "try-clap";
-const CLAP_RENAME: &str = "clap-greeter";
-
-/// Exercise the playground and script lifecycles:
-/// (create, configure, query, rename, run, etc.)
+/// Exercise the playground and script lifecycles.
 ///
-/// This includes stuff that you don't want to run by
-/// default (download dependencies, compile and run code)
-/// so it's ignored by default,
-/// run it with `cargo test -- --ignored`
+/// This is an e2e test that should every subcommand
+/// at least once:
+/// - [x] init
+/// - [x] run
+/// - [x] new
+/// - [x] quick
+/// - [x] rename
+/// - [x] list
+/// - [x] info
+/// - [x] inject
+/// - [ ] edit (tbf pretty trivial)
+/// - ~~[ ] completions~~ (checked elsewhere)
+/// - [x] check
+///
+/// (As with everything here,
+/// this won't run by default, use `cargo test -- --ignored`)
 ///
 /// By default, this test invokes our executable from a tempdir, via
 /// something along the lines of
@@ -25,60 +38,59 @@ const CLAP_RENAME: &str = "clap-greeter";
 ///     1. as a cargo subcommand
 ///     2. as a standalone exe
 ///
+/// TODO: add ability to disable color output (and test that it works ...
+///      `runner.expect_no_ansi_escapes_in_stdout()` or something?)
+///      so we can check the output more reliably.
 #[test]
 #[ignore]
 fn test_playground_lifecycle() {
-    let mut runner = Runner::new();
+    // TODO: this runs our commands via `cargo run --bin cargo-playgronud -- [args]`.
+    //   Should be testing this _as installed_ in both direct and subcmd mode.
+    let tempdir = ScratchDir::new();
+    let mut runner = Runner::new(&tempdir);
 
+    // ───── 1. Newly initialized project ───────────────────────────── //
     // ───── Project creation ─────
-    runner
-        .run(&["init", PROJECT_NAME])
-        .expect_ok("failed to init project");
+    runner.run_cpg(&["init", PROJECT_NAME]).expect_ok();
 
     runner.cd(PROJECT_NAME);
 
     // check some (not all) files
     runner
         .expect_file("Cargo.toml")
-        .expect_file(&format!("src/{}.rs", FIRST_SCRIPT_NAME.replace('-', "_")))
+        .expect_file(&projpath("src", INIT_SCRIPT, "rs"))
         .expect_file("templates/basic.rs.template");
 
     runner.consistency_checks();
 
-    // probably check it every time? TODO: implement "check" (instead of `do-nothing` maybe)
-    // runner.run(&["check"]).expect_ok("Project check failed");
-
-    // ───── Test whether shell autocomplete works ─────
-    // (just a sanity check)
-
     // ───── Commands in newly-created state ─────
     runner
-        .run(&["list", "-q"])
-        .expect_ok("failed to list initial project")
-        .expect_stdout(FIRST_SCRIPT_NAME);
+        .run_cpg(&["list", "-q"])
+        .expect_ok()
+        .expect_stdout(INIT_SCRIPT);
 
-    runner
-        .run(&["run", FIRST_SCRIPT_NAME])
-        .expect_ok("Project check failed");
+    runner.run_cpg(&["run", INIT_SCRIPT]).expect_ok();
 
     // try to create an existing script
-    runner
-        .run(&["new", FIRST_SCRIPT_NAME])
-        .expect_fail("name collision");
+    runner.run_cpg(&["new", INIT_SCRIPT]).expect_fail();
 
-    // ───── Creating new commands ─────
+    // ───── 2. Adding scripts ─────────────────────────────────────── //
+    // ───── 2a. SCRIPT2: set name, no dependencies ─────
     // bare script
+    let expect_script2_path = projpath("src", SECOND_SCRIPT, "rs");
     runner
-        .run(&["new", SCRIPT2, "--template=basic"])
-        .expect_ok("failed to create new script");
-    runner.expect_file(&format!("src/{SCRIPT2}.rs"));
+        .run_cpg(&["new", SECOND_SCRIPT, "--template=basic"])
+        .expect_ok();
+    runner.expect_file(&expect_script2_path);
+    runner.run_cpg(&["run", SECOND_SCRIPT]).expect_ok();
     runner
-        .run(&["run", SCRIPT2])
-        .expect_ok("failed to run new script");
+        .run_cpg(&["info", SECOND_SCRIPT])
+        .expect_ok()
+        .expect_stdout_contains(&expect_script2_path);
 
-    // and now with dependencies
+    // ───── 2b. TRY_CLAP_SCRIPT: Automatically named, w/ dependencies ─────
     runner
-        .run(&[
+        .run_cpg(&[
             "quick",
             "clap",
             "--features",
@@ -87,31 +99,70 @@ fn test_playground_lifecycle() {
             "clap",
             "-q",
         ])
-        .expect_ok("quick script with dependencies")
+        .expect_ok()
         .expect_stdout_contains(TRY_CLAP_SCRIPT)
-        .expect_stdout_contains(&format!(
-            "src/{}.rs",
-            TRY_CLAP_SCRIPT.replace('-', "_"),
-        ));
+        .expect_stdout_contains(&projpath("src", TRY_CLAP_SCRIPT, "rs"));
 
-    // TODO: don't require the '--' arg, like how `docker run [imagename]` works
+    // TODO: don't require the '--' arg, like how `docker run [imagename]` works:
+    //   any `cpg run` flag must come before the script name, and any arguments
+    //   after the script name are passed to the script
     runner
-        .run(&["run", TRY_CLAP_SCRIPT, "--", "2", "--name", "marge simpson"])
-        .expect_ok("running clap template script")
+        .run_cpg(&[
+            "run",
+            TRY_CLAP_SCRIPT,
+            "--",
+            "2",
+            "--name",
+            "marge simpson",
+        ])
+        .expect_ok()
         .expect_stdout_contains("oh hi marge simpson");
 
-    // renaming scripts
+    // ───── 3. Modifying scripts ─────────────────────────────────────── //
+
+    // ───── 3a. rename TRY_CLAP_SCRIPT -> CLAP_RENAME ─────
+    let expect_rename_path = projpath("src", CLAP_RENAME, "rs");
+
     runner
-        .run(&["rename", TRY_CLAP_SCRIPT, CLAP_RENAME])
-        .expect_ok("failed to rename script");
+        .run_cpg(&["rename", TRY_CLAP_SCRIPT, CLAP_RENAME])
+        .expect_ok();
+    runner.expect_file(&expect_rename_path);
+
+    // test that query functions return it (and not the old one)
+    runner.run_cpg(&["info", TRY_CLAP_SCRIPT]).expect_fail();
     runner
-        .run(&["list", "-q"])
-        .expect_ok("listing after rename")
+        .run_cpg(&["info", CLAP_RENAME])
+        .expect_ok()
+        .expect_stdout_contains(&expect_rename_path)
+        .expect_stdout_contains("\"clap\"")
+        .expect_stdout_contains("\"clap/derive\"");
+
+    runner
+        .run_cpg(&["list", "-q"])
+        .expect_ok()
         .expect_stdout_contains(CLAP_RENAME);
-    runner.expect_file(&format!("src/{}.rs", CLAP_RENAME.replace('-', "_")));
 
-    // internal consistency checks again
+    // ───── 3b. adding new dependencies ─────
+    // dependency + implicit-dependency feature
+    runner
+        .run_cpg(&["inject", CLAP_RENAME, "anyhow", "-F", "backtrace"])
+        .expect_ok();
+
+    // explicit-dependency features
+    runner
+        .run_cpg(&["inject", CLAP_RENAME, "--features=clap/color"])
+        .expect_ok();
+
+    // check that they are all at least listed in the output
+    runner
+        .run_cpg(&["info", CLAP_RENAME])
+        .expect_ok()
+        .expect_stdout_contains("\"clap\"")
+        .expect_stdout_contains("\"clap/derive\"")
+        .expect_stdout_contains("\"clap/color\"")
+        .expect_stdout_contains("\"anyhow\"")
+        .expect_stdout_contains("\"anyhow/backtrace\"");
+
+    // ───── Final checks ───────────────────────────────────────────── //
     runner.consistency_checks();
-
-    // TODO: Test autocomplete
 }
