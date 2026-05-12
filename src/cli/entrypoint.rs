@@ -19,7 +19,7 @@ pub fn autocomplete_or_parse_args() -> cli::MainCli {
     {
         _run_cargo_subcmd_autocomplete_and_exit()
     }
-    if env::var(super::SUBCMD_COMPLETE_VAR)
+    if env::var(super::DIRECT_COMPLETE_VAR)
         .map(|x| !x.is_empty())
         .unwrap_or(false)
     {
@@ -57,7 +57,7 @@ fn _run_cargo_subcmd_autocomplete_and_exit() {
     // we exit immediately - the user is running some other cargo cmd.
     let arg0 = arg_iter.next().expect("argv[0] exists");
     let cmd_suffix = crate::util::cargo_cmd_suffix(Utf8Path::new(&arg0));
-    let subcmd_cli_arg = arg_iter.skip_while(|arg| arg != "--").nth(1);
+    let subcmd_cli_arg = arg_iter.skip_while(|arg| arg != "--").nth(2);
 
     // IF we were called as "cargo-thing -- cargo thing", then "thing"
     // is the name of our subcommand, so go ahead and generate completions
