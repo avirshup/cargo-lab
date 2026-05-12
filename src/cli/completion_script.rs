@@ -1,6 +1,6 @@
 use std::{env, io};
 
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use clap_complete::env::Shells;
 
 use super::InvocationType;
@@ -30,9 +30,7 @@ pub fn print_completion_script(
     // will _generate_ the completions
     // here, this is always _this binary_ (not ever cargo itself)
     let arg0 = Utf8PathBuf::from(env::args().next().expect("argv[0]"));
-    let this_exe = arg0
-        .canonicalize_utf8()
-        .expect("exe has well-defined utf-8 path");
+    let this_exe = _cmd_or_canonical_path(&arg0);
     let completion_generator = this_exe.as_str();
 
     // an identifier for the command
@@ -66,4 +64,16 @@ pub fn print_completion_script(
                 "Failed to write completion script for shell '{shell_name}'"
             )
         })
+}
+
+/// Determine if `path` is a command on the $PATH or a filesystem path
+/// and canonicalize it if it's a filesystem path.
+///
+/// Panics if given a non-utf-8 path  and empty strings.
+fn _cmd_or_canonical_path(path: &Utf8Path) -> Utf8PathBuf {
+    match path.components().count() {
+        0 => panic!("argv[0] is empty???"),
+        1 => path.to_owned(),
+        _2_or_more => path.canonicalize_utf8().expect("Path is valid utf-8"),
+    }
 }
