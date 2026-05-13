@@ -1,4 +1,0 @@
-[toolchain]
-channel = "stable"
-# # for experimental RFC 3502 testing
-#channel = "nightly"
