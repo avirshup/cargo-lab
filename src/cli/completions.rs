@@ -3,6 +3,7 @@ use std::env;
 use std::ffi::OsStr;
 use std::path::Path;
 
+use clap_complete::engine::ValueCompleter;
 use clap_complete::{
     ArgValueCandidates, ArgValueCompleter, CompletionCandidate, PathCompleter,
 };
@@ -45,6 +46,32 @@ pub fn script_name_completer() -> ArgValueCandidates {
         }
     })
 }
+//
+// pub fn script_name_as_first_element_completer() -> ArgValueCompleter {
+//     ArgValueCompleter::new(FirstElementCompleter(script_name_completer()))
+// }
+//
+// struct FirstElementCompleter(ArgValueCandidates);
+//
+// impl ValueCompleter for FirstElementCompleter {
+//     /// only completes if index is 0
+//     fn complete(&self, _current: &OsStr) -> Vec<CompletionCandidate> {
+//         Vec::new()
+//     }
+//
+//     fn complete_at(
+//         &self,
+//         arg_index: usize,
+//         _current: &OsStr,
+//     ) -> Vec<CompletionCandidate> {
+//         eprintln!("completing! `{arg_index}`");
+//         if arg_index == 0 {
+//             self.0.candidates()
+//         } else {
+//             Vec::new()
+//         }
+//     }
+// }
 
 pub fn template_name_completer() -> ArgValueCandidates {
     ArgValueCandidates::new(|| {

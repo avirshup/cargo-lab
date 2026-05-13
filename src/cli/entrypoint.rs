@@ -25,9 +25,11 @@ pub fn autocomplete_or_parse_args() -> cli::MainCli {
     {
         _run_normal_autocomplete_and_exit()
     };
-    // if the program didn't exit by now, then we're not in autocomplete mode
 
     // ───── Parse the CLI arguments and return them ─────
+    // if the program didn't exit by now, then we're not in autocomplete mode
+    // and proceed as normal
+
     // this is a slightly customized version of what `Parser::parse()` does
     let invocation = super::InvocationType::from_env();
     let cmd = invocation.build_cli_cmd();
