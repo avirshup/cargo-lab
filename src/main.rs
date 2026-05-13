@@ -194,7 +194,25 @@ fn _build_script_request(
 
 const MAX_UNIQUE_NAME_TRIES: u8 = 100;
 
+/// generate a random script name from the ether
+fn _generate_script_name(pred: impl Fn(&str) -> bool) -> String {
+    for _i in 0..MAX_UNIQUE_NAME_TRIES {
+        let name = random_names::random_name();
+        if pred(&name) {
+            return name;
+        };
+    }
+
+    // if this can't find a unique name within 100 tries something is very wrong
+    panic!("Failed to find a unique name?");
+}
+
 /// generate a random script name based on depependency names
+/// will be "try-{dep1}[-{dep2}[-...]]" if it does not exist yet,
+/// otherwise "{random adverb}-try-{dep1}[-{dep2}[-...]]`
+///
+/// (Unfortunately the adverbs will often be misspelled because we're
+/// just appending "ly" to adjectives.)
 fn _generate_script_name_from_deps(
     deps: &[data::DepRequest],
     pred: impl Fn(&str) -> bool,
@@ -214,20 +232,7 @@ fn _generate_script_name_from_deps(
     }
 
     for _i in 0..MAX_UNIQUE_NAME_TRIES {
-        let name = format!("{basename}-{}", random_names::random_adjective());
-        if pred(&name) {
-            return name;
-        };
-    }
-
-    // if this can't find a unique name within 100 tries something is very wrong
-    panic!("Failed to find a unique name?");
-}
-
-/// generate a random script name from the ether
-fn _generate_script_name(pred: impl Fn(&str) -> bool) -> String {
-    for _i in 0..MAX_UNIQUE_NAME_TRIES {
-        let name = random_names::random_name();
+        let name = format!("{}ly-{basename}", random_names::random_adjective());
         if pred(&name) {
             return name;
         };
