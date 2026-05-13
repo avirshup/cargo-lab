@@ -65,7 +65,7 @@ fn run(args: cli::MainCli) -> Result<()> {
 
     if verbosity >= global_ctx::Debug {
         eprintln!("ARGV: {:?}", env::args());
-        eprintln!("env vars: {:?}", env::vars());
+        // eprintln!("env vars: {:?}", env::vars());
         eprintln!("Parsed args: {args:#?}");
     }
 
@@ -90,7 +90,10 @@ fn run(args: cli::MainCli) -> Result<()> {
         }) => {
             ops::run_script(&bin_name, &args, ctx)?;
         },
-
+        // alternate form what doesn't work rn
+        // cli::SubCmd::RunScript(cli::RunScript { args }) => {
+        //     ops::run_script(&args[0], &args[1..], ctx)?;
+        // },
         cli::SubCmd::NewScript(cli::NewScript {
             script_name,
             opts:

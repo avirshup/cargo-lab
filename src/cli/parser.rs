@@ -5,10 +5,10 @@ use clap::{Args, Command, Parser, Subcommand};
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
 };
-use super::derive_traits::GeneratesArgs;
 use super::feature_parsers::{
     FeatureCliInput, parse_dep_arg, parse_feature_arg,
 };
+use super::passthrough_arg_macro::GeneratesArgs;
 use crate::vendor_cargo::style;
 use crate::{build_passthrough_long_args, data};
 
@@ -163,6 +163,31 @@ pub struct RunScript {
     pub args: Vec<String>,
 }
 
+// // alternate form that consumes ALL arguments after the script
+// // name, even `--help` (probably). HOWEVER it doesn't work
+// // with the current version of clap_complete (possibly a bug
+// // with how `ValueCompleter::complete_at` is called?),
+// // and also the help string sucks
+// /// Run an existing script from the playground
+// #[apply(DeriveArg)]
+// #[derive(Args)]
+// pub struct RunScript {
+//     // /// Script to run
+//     // #[arg(
+//     //         add = script_name_completer(),
+//     //         value_name = "SCRIPT"
+//     // )]
+//     // pub script_name: String,
+//     /// Script and arguments
+//     #[arg(
+//         allow_hyphen_values = true,
+//         trailing_var_arg = true,
+//         num_args = 1..,
+//         add = script_name_as_first_element_completer(),
+//     )]
+//     pub args: Vec<String>,
+// }
+
 /// Create a new playground script
 #[apply(DeriveArg)]
 #[derive(Args)]
@@ -315,6 +340,9 @@ missing dependencies will be installed with `cargo add`",
     )]
     pub deps: Vec<data::DepRequest>,
 
+    // TODO: could this be flattened using Arg::value_delimeter?
+    //   Is there a way to have more than one delimiter? (i.e.,
+    //   here, commas OR any whitespace?)
     #[arg(
         short = 'F',
         long = "features",
@@ -330,13 +358,17 @@ The [DEPNAME/] prefix may be omitted if exactly one dependency has been specifie
     pub features: Vec<Vec<FeatureCliInput>>,
 
     // TODO: this takes up too many lines now??
-    #[command(flatten, next_help_heading = "Arguments for \"cargo add\"")]
+    #[command(flatten, next_help_heading = "Arguments for `cargo add`")]
     pub cargo_add_args: CargoAddArgs,
 }
 
-// MAYBN: this should just be a regular struct definition w/ a derive macro
+// MAYBE: this should just be a regular struct definition w/ a derive macro
 //   (use `macro_rules_attribute` and/or `derive_deftly`)?
-//   Although ... using a DSL is tbh easier?
+//   Although ... using a DSL is tbh way way easier
+//   because it doesn't have to support everything?
+// TODO: when you `--help`, each one of these arguments takes up 3 lines even though
+//       it has no help. Overriding the command's help template won't help because
+//       it doesn't control arg formatting.
 build_passthrough_long_args!(
     /// Specific args to be forwarded to cargo add
     ///

@@ -352,9 +352,6 @@ pub fn edit_script(
     Ok(())
 }
 
-// ───── Project check ──────────────────────────────────────────── //
-// TODO: probably this gets its own module
-
 // ───── Helpers ────────────────────────────────────────────────── //
 /// Create a sensible `bin[].path` value from the script's name.
 fn _path_from_script_name(bin_name: &str) -> Utf8PathBuf {
