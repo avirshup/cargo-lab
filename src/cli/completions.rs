@@ -3,7 +3,6 @@ use std::env;
 use std::ffi::OsStr;
 use std::path::Path;
 
-use clap_complete::engine::ValueCompleter;
 use clap_complete::{
     ArgValueCandidates, ArgValueCompleter, CompletionCandidate, PathCompleter,
 };

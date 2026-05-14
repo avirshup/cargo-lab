@@ -149,7 +149,7 @@ pub fn new_script(
 
     // update the in-memory Cargo.toml
     let mut manifest_editor = new_ctx.new_editor()?;
-    manifest_editor.add_new_bin(&request.script, &src_filename.as_str())?;
+    manifest_editor.add_new_bin(&request.script, src_filename.as_str())?;
     manifest_editor.activate_features(
         &request.script,
         &request.deps,
