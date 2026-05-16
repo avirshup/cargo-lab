@@ -12,7 +12,7 @@ use crate::{data, util};
 
 #[cfg(feature = "xtask")]
 const ENV_XTASK_MANIFEST_PATH: &str = "CARGO_MANIFEST_DIR";
-const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
+pub const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Verbosity {
@@ -34,6 +34,12 @@ type CachedResult<'a, T> = Result<&'a T, &'a crate::Error>;
 /// different configuration needs (e.g., the "init"
 /// command does not even need a manifest,
 /// but the `run` command needs a fully configured manifest).
+///
+/// TODO:
+/// I don't like calling things "context" since it's an
+/// overloaded word that means 50 different things in various
+/// ... uh, well, contexts ... but "GlobalCtx" is what cargo calls it.
+/// Although this is not actually really Global?
 ///
 /// # How manifest discovery works
 /// The manifest directory we use  will be the first one of these that is not `None`:

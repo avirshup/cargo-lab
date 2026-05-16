@@ -1,6 +1,7 @@
 use camino::Utf8PathBuf;
 use clap::builder::Styles;
 use clap::{Args, Command, Parser, Subcommand};
+use color_print::cformat;
 
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
@@ -9,6 +10,7 @@ use super::feature_parsers::{
     FeatureCliInput, parse_dep_arg, parse_feature_arg,
 };
 use super::passthrough_arg_macro::GeneratesArgs;
+use crate::cli::invocations::InvocationType;
 use crate::vendor_cargo::style;
 use crate::{build_passthrough_long_args, data};
 
@@ -314,12 +316,28 @@ impl WriteCompletionScript {
     /// within use a regex or something to expand a placeholder
     /// within the docstrings?)
     fn add_after_help_examples(cmd: Command) -> Command {
-        let invocation = cmd.get_bin_name().unwrap_or("cargo-playground");
+        let invocation = InvocationType::from_env();
 
-        let helpstr = format!(
+        // `get_bin_name()` is not the bin name, it
+        // actually returns the bin name _with the subcommand already appended to it_
+        // (e.g., "cargo-playground completions")
+        let this_cmd =
+            cmd.get_bin_name().unwrap_or("cargo-playground completions");
+
+        let invocation_exe = match &invocation {
+            InvocationType::CargoSubcmd { cargo_exe, .. } =>
+                cargo_exe.file_name().unwrap(),
+            InvocationType::Direct(exe) => exe.file_name().unwrap(),
+        };
+
+        let helpstr = cformat!(
             r#"
-To activate the command line completions for the current session, run
-   $ {invocation} completions $shellname | source
+To activate the command line completions for *the current session*, run
+   `<cyan>{this_cmd} <<SHELL>> | source</>`
+
+To permanently activate autocomplete, add the above line to your shell's
+startup script, or add it to the "<blue>{invocation_exe}</>" entry in your shell's
+completion script registry (if it has one).
 "#
         );
 

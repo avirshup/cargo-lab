@@ -6,7 +6,7 @@ use color_print::{cformat, cprintln};
 use crate::global_ctx::{GlobalCtx, ProjectPaths};
 use crate::manifest_data::{BinTable, ManifestData};
 
-pub fn check_config(ctx: GlobalCtx) -> crate::Result<()> {
+pub fn check_project(ctx: GlobalCtx) -> crate::Result<()> {
     // ───── Basic project config ───────────────────────────────────── //
     // we can't check much if any of these fail
     cprintln!("Checking cargo playground configuration ...");

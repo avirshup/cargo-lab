@@ -21,16 +21,11 @@ pub(super) enum InvocationType {
         cargo_exe: Utf8PathBuf,
         cargo_subcmd: String,
     },
-    Direct(),
+    Direct(Utf8PathBuf),
 }
 
 impl InvocationType {
     pub(super) fn from_env() -> Self {
-        // if $CARGO is not set, then we weren't called from cargo
-        let Ok(cargo_exe) = env::var("CARGO") else {
-            return InvocationType::Direct();
-        };
-
         let mut arg_iter = env::args();
 
         // figure out bin name
@@ -38,7 +33,11 @@ impl InvocationType {
         let exe_path = Utf8Path::new(&arg0);
 
         // was it invoked as "cargo-subcmd subcmd [...]" or nah?
-        if let Some(arg1) = arg_iter.next()
+        // This is somewhat heuristic - there is not a way to know for sure
+        // AFAICT, so it might have false positives
+        // in certain (I think very rare) circumstances
+        if let Ok(cargo_exe) = env::var("CARGO")
+            && let Some(arg1) = arg_iter.next()
             && let Some(cmd_suffix) = crate::util::cargo_cmd_suffix(exe_path)
             && arg1 == cmd_suffix
         {
@@ -47,14 +46,14 @@ impl InvocationType {
                 cargo_subcmd: arg1,
             }
         } else {
-            InvocationType::Direct()
+            InvocationType::Direct(exe_path.to_owned())
         }
     }
 
     pub(super) fn env_var_name(&self) -> &'static str {
         match self {
             InvocationType::CargoSubcmd { .. } => SUBCMD_COMPLETE_VAR,
-            InvocationType::Direct() => DIRECT_COMPLETE_VAR,
+            InvocationType::Direct(_) => DIRECT_COMPLETE_VAR,
         }
     }
 
