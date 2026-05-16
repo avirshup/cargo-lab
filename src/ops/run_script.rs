@@ -22,13 +22,16 @@ pub fn run_script(
     let mut cmd = process::Command::new(&ctx.cargo_exe);
     cmd.args([
         "run",
+        "--manifest-path",
+        ctx.project_paths()?.cargo_dot_toml.as_str(),
         "--bin",
         &script_entry.name,
-        "--features",
-        &script_entry.required_features.join(","),
-        "--",
-    ])
-    .args(args);
+    ]);
+    if !script_entry.required_features.is_empty() {
+        cmd.args(["--features", &script_entry.required_features.join(",")]);
+    }
+    cmd.arg("--");
+    cmd.args(args);
 
     util::show_invocation(&cmd);
 
