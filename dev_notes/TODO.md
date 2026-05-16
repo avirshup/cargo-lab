@@ -109,13 +109,21 @@
 - [x] lifecycle test
     - init a repo, add templates, create scripts, add dependencies, run scripts
 - [x] more fun w/ autocompletion:
-    - [ ] don't suggest flags unless current arg starts with a '-' maybe?
-        - this is what clap's stable (static) completion implementation does
+    - [x] nah ~~don't suggest flags unless current arg starts with a '-' maybe?
+      (this is what clap's stable (static) completion implementation does)~~
     - [x] what is right way to install this in fish that doesn't conflict w/
       cargo itself? (answer: autocomplete `cargo` cmd but don't invoke
       clap's autocomplete method unless we're sure that our subcommand
       has been invoked)
-    - [ ] test with bash, zsh
+
+- [ ] autocomplete - playing nice w/ others
+    - [ ] in bash: sourcing our autocompletions overrides the native
+      `cargo` completions
+    - [ ] in fish:
+      *sourcing* our completions does not override the native completions.
+      But adding a `cargo.fish` to our completions directory DOES override the native
+      completions (presumably because it stops looking for completions to lazy-load
+      after it finds the first `cargo.fish`?)
 
 ## Functionality
 

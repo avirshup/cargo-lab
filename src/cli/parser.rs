@@ -106,14 +106,14 @@ pub enum SubCmd {
     #[command(name = "edit")]
     EditScript(EditScript),
 
-    /// Print CLI completion commands to stdout.
+    /// Generate shell autocomplete scripts
     #[command(
         name = "completions",
         defer=WriteCompletionScript::add_after_help_examples,
     )]
     WriteCompletionScript(WriteCompletionScript),
 
-    /// Check configuration
+    /// Project configuration health checks
     #[command(name = "check")]
     Check,
 }

@@ -12,7 +12,7 @@ all:
     BUILD +test-e2e
 
 # ───── Base environment setup ─────────────────────────────────── #
-env:
+build-env:
     # project dir
     WORKDIR /src/project
 
@@ -42,7 +42,7 @@ env:
         cargo-edit"
 
 src-tree-prep:
-    FROM +env
+    FROM +build-env
     ARG build_tag=""
     # Checks out specific tag if requested,
     # sets version in Cargo.toml, then exports the minimal tree
@@ -79,7 +79,7 @@ src-tree-prep:
     #   I just figured out what's going on)
 
 src:
-    FROM +env
+    FROM +build-env
     # Image layer w/ prepped source tree
 
     # For caching purposes we _copy_ this from +src-tree-prep
@@ -118,17 +118,17 @@ test-e2e:
 # ───── Outputs ────────────────────────────────────────────────── #
 build:
     FROM +src
-    ARG MODE="release"
+    ARG profile="release"
     ARG BIN_NAME="cargo-playground"
 
     DO rust+CARGO \
-        --args="build --${MODE}" \
-        --output="$MODE/$BIN_NAME"
-    RUN test -e target/$MODE/$BIN_NAME
+        --args="build --profile=${profile}" \
+        --output="$profile/$BIN_NAME"
+    RUN test -e target/$profile/$BIN_NAME
 
-    LET BIN_TARGET="$(rustc --print host-tuple)/${BIN_NAME}-${CRATE_VERSION}-${MODE}"
+    LET BIN_TARGET="$(rustc --print host-tuple)/${BIN_NAME}-${CRATE_VERSION}-${profile}"
     SAVE ARTIFACT \
-        target/$MODE/$BIN_NAME \
+        target/$profile/$BIN_NAME \
         AS LOCAL \
         "./artifacts/${BIN_TARGET}"
 
