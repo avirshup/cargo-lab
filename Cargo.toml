@@ -11,6 +11,21 @@ path = "src/main.rs"
 xtask = []  # for use as an "xtask" in a subfolder of the project root
 experimental_cargo_script_rfc3502 = ["dep:winnow"]
 
+# (most?) aggressive size optimizations
+# In linux/mac tests, this reduces size by 50% from normal release
+# from https://github.com/BurntSushi/ripgrep/blob/4519153/Cargo.toml#L77-L87
+[profile.release-lto]
+inherits = "release"
+opt-level = 3
+debug = "none"
+strip = "symbols"
+debug-assertions = false
+overflow-checks = false
+lto = "fat"
+panic = "abort"
+incremental = false
+codegen-units = 1
+
 # ───── DEPS ───────────────────────────────────────────────────── #
 [dependencies]
 all-the-errors = "0.1.1" # my crate
@@ -44,8 +59,3 @@ assert_cmd = "2.2.1"
 
 # Trust: very high (blessed.rs)
 tempfile = "3.27.0"
-
-
-# ───── BUILD DEPS ─────────────────────────────────────────────── #
-[build-dependencies]
-camino = "1.2.2"  # same as runtime dep (could use a workspace to synchronize ...)
