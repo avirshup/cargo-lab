@@ -182,6 +182,21 @@ impl GlobalCtx {
     /// state. Unlike most of the other methods here, this is *not* cached
     /// (it constructs a new editor every time it is called).
     pub fn new_editor(&self) -> crate::Result<ManifestEditor> {
+        let Some(pgcfg) = self.playground_config() else {
+            return Err(crate::Error::NoConfig(
+                "`[package.metadata.cargo-playground]` table not present"
+                    .to_owned(),
+            ));
+        };
+
+        if !pgcfg.enabled {
+            return Err(crate::Error::ManifestNotEditable(
+                "In `[package.metadata.cargo-playground]`, `enabled` is not \
+                 `true`"
+                    .to_owned(),
+            ));
+        }
+
         self.manifest_raw()
             .map_err(Clone::clone)
             .and_then(ManifestEditor::from_string)
