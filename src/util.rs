@@ -1,8 +1,10 @@
+use std::fmt::Write;
 use std::path::Path;
 use std::{fs, process};
 
 use camino::Utf8Path;
-use color_print::ceprintln;
+use color_print::{ceprintln, cprint, cwrite};
+use similar::ChangeTag;
 
 /// A rough attempt to print the subprocess invocations we're about to run.
 /// TODO: this should be controlled via verbosity level
@@ -79,44 +81,6 @@ pub fn cargo_cmd_suffix(exe_path: &Utf8Path) -> Option<&str> {
 pub fn canonicalize_crate_name(s: &str) -> String {
     s.to_lowercase().replace('-', "_")
 }
-//
-// /// Ensure that a requested filename for a script is of the form
-// /// "src/[filename].rs"
-// ///
-// /// It will correct for the following input issues:
-// ///  - if ".rs" is not present it will add it
-// ///  - the leading "src/" will be added if not present
-// pub fn normalize_script_path(
-//     input_path: &Utf8Path,
-// ) -> crate::Result<Utf8PathBuf> {
-//     // extract the filename from paths of the form "src/filename", if necessary
-//     // TODO: this function has hardcoded "src" thus it is business logic, not a util
-//     let filename: &str = {
-//         let mut path_part_iter = input_path.components().map(|p| p.as_str());
-//         match [
-//             path_part_iter.next(),
-//             path_part_iter.next(),
-//             path_part_iter.next(),
-//         ] {
-//             [Some("src"), Some(fname), None] => Ok(fname),
-//             [Some(fname), None, None] => Ok(fname),
-//             _otherwise =>
-//                 Err(crate::Error::InvalidScriptFilename(input_path.to_owned())),
-//         }
-//     }?;
-//
-//     // strip trailing ".rs" if present
-//     let stem = filename.strip_suffix(".rs").unwrap_or(filename);
-//
-//     if !stem
-//         .chars()
-//         .all(|c| c.is_ascii_digit() || c.is_ascii_alphabetic() || c == '_')
-//     {
-//         return Err(crate::Error::InvalidScriptFilename(input_path.to_owned()));
-//     }
-//
-//     Ok(Utf8Path::new("src").join(stem).with_extension("rs"))
-// }
 
 // ───── Wrappers around stdlib with our own error handling ─────── //
 // we can't just use a From trait for these because afaict io::Error doesn't provide
@@ -171,23 +135,55 @@ pub fn create_dir(path: &Utf8Path) -> crate::Result<()> {
     })?;
     Ok(())
 }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test_normalize_script_path() {
-//         for (input, expected) in [
-//             ("hi", "src/hi.rs"),
-//             ("bye.rs", "src/bye.rs"),
-//             ("src/sigh", "src/sigh.rs"),
-//             ("src/die.rs", "src/die.rs"),
-//         ] {
-//             assert_eq!(
-//                 normalize_script_path(input.into()).unwrap(),
-//                 expected.to_owned()
-//             );
-//         }
-//     }
-// }
+
+// ───── Diffing ────────────────────────────────────────────────── //
+/// Write a human-readable diff of 2 files to stdout
+///
+/// Basically https://github.com/mitsuhiko/similar/blob/main/examples/terminal-inline.rs
+pub fn display_file_diff(old_content: &str, new_content: &str) {
+    let diff = similar::TextDiff::from_lines(old_content, new_content);
+
+    for (idx, group) in diff.grouped_ops(3).iter().enumerate() {
+        if idx > 0 {
+            println!("{:-^1$}", "-", 80);
+        }
+        for op in group {
+            for change in diff.iter_inline_changes(op) {
+                // ───── Create the diff ─────
+                // we'll build up the line in this buffer before writing it
+                // (Note we can safely unwrap all the `write!`s to this,
+                // writing to a buffer never returns an error)
+                let mut diff_display = String::new();
+
+                // format the actual diff for this line
+                for (emphasized, value) in change.iter_strings_lossy() {
+                    if emphasized {
+                        cwrite!(&mut diff_display, "<underline>{value}</>")
+                    } else {
+                        write!(&mut diff_display, "{value}")
+                    }
+                    .unwrap();
+                }
+                if change.missing_newline() {
+                    writeln!(&mut diff_display).unwrap();
+                }
+
+                // ───── Write to stdout ─────
+                // write the line numbers for this line
+                for lineno in [change.old_index(), change.new_index()] {
+                    match lineno {
+                        None => print!("{:<4}", ""),
+                        Some(idx) => print!("{:<4}", idx + 1),
+                    }
+                }
+                match change.tag() {
+                    ChangeTag::Equal => cprint!("| <dim>{diff_display}</dim>"),
+                    ChangeTag::Delete =>
+                        cprint!("|<bold>-</><red>{diff_display}</>"),
+                    ChangeTag::Insert =>
+                        cprint!("|<bold>+</><green>{diff_display}</>"),
+                }
+            }
+        }
+    }
+}

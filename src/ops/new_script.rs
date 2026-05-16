@@ -16,6 +16,7 @@ pub fn new_script(
 ) -> crate::Result<()> {
     // TODO: split this up, needs to have one entrypoint for being
     //  called from `main.rs`, another when being called from other ops.
+    let orig_manifest_content = ctx.manifest_raw()?.to_owned();
 
     // early exit if script matching this name already exists
     if ctx.manifest_data()?.get_script(&request.script).is_some() {
@@ -27,12 +28,12 @@ pub fn new_script(
     // (if it was necessary, this returns a new context since
     // it will have modified Cargo.toml)
     let new_ctx =
-        _common::_run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
+        _common::run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
 
     // ───── Part 2: create the source file ─────────────────────────── //
     // TODO: less TOCTOU here, use `File::create_new`?
     let paths = new_ctx.project_paths()?;
-    let src_filename = _common::_path_from_script_name(&request.script);
+    let src_filename = _common::path_from_script_name(&request.script);
     let dest = paths.manifest_dir.join(&src_filename);
     if dest.is_file() {
         // if the _source file_ already exists, don't overwrite it,
@@ -56,10 +57,7 @@ pub fn new_script(
         }
     } else {
         // create the source file using our built-in super-minimal script
-        util::write_file(
-            &dest,
-            &_common::_init_minimial_script(&request.script),
-        )?;
+        util::write_file(&dest, &_common::minimal_script(&request.script))?;
 
         if new_ctx.verbosity > global_ctx::Quiet {
             ceprintln!(
@@ -77,7 +75,8 @@ pub fn new_script(
         &request.deps,
         &request.features,
     )?;
-    _common::_update_manifest_and_show_diff(
+    _common::update_manifest_and_show_diff(
+        &orig_manifest_content,
         &manifest_editor,
         &paths.cargo_dot_toml,
     )?;
