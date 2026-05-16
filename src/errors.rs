@@ -18,6 +18,9 @@ pub enum Error {
     #[error("Unknown shell: {0}")]
     UnknownShell(String),
 
+    #[error("Cargo.toml cannot be edited: {0}")]
+    ManifestNotEditable(String),
+
     // ───── I/o / subproc related ─────
     #[error("IO operation error: {desc} ({err})")]
     IoFail { desc: String, err: String },

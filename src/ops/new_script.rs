@@ -30,10 +30,19 @@ pub fn new_script(
     let new_ctx =
         _common::run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
 
-    // ───── Part 2: create the source file ─────────────────────────── //
+    // ───── Part 2: update the manifest in memory ──────────────────── //
+    let mut manifest_editor = new_ctx.new_editor()?;
+    let src_filename = _common::path_from_script_name(&request.script);
+    manifest_editor.add_new_bin(&request.script, src_filename.as_str())?;
+    manifest_editor.activate_features(
+        &request.script,
+        &request.deps,
+        &request.features,
+    )?;
+
+    // ───── Part 3: create the source file on disk ─────────────────── //
     // TODO: less TOCTOU here, use `File::create_new`?
     let paths = new_ctx.project_paths()?;
-    let src_filename = _common::path_from_script_name(&request.script);
     let dest = paths.manifest_dir.join(&src_filename);
     if dest.is_file() {
         // if the _source file_ already exists, don't overwrite it,
@@ -67,14 +76,7 @@ pub fn new_script(
         }
     }
 
-    // ───── Part 3: update the manifest ────────────────────────────── //
-    let mut manifest_editor = new_ctx.new_editor()?;
-    manifest_editor.add_new_bin(&request.script, src_filename.as_str())?;
-    manifest_editor.activate_features(
-        &request.script,
-        &request.deps,
-        &request.features,
-    )?;
+    // ───── Part 4: update the manifest on disk ───────────────────────── //
     _common::update_manifest_and_show_diff(
         &orig_manifest_content,
         &manifest_editor,
