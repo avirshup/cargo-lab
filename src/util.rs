@@ -39,10 +39,15 @@ pub fn show_invocation(cmd: &process::Command) {
         }
     }
     ceprintln!(
-        "<cyan>running:</>\n<blue>$</> <green>{}</>{}",
+        "<green>running:</>\n<blue>$</> <green>{}</>{}",
         cmd_name,
-        arg_display
+        arg_display,
     );
+    if let Some(workdir) = cmd.get_current_dir() {
+        ceprintln!("  in working dir:<blue>{}</>", workdir.to_string_lossy(),);
+    } else {
+        ceprintln!("  in PWD");
+    }
 }
 
 /// Why not built-in?

@@ -41,6 +41,9 @@ use common::*;
 /// TODO: add ability to disable color output (and test that it works ...
 ///      `runner.expect_no_ansi_escapes_in_stdout()` or something?)
 ///      so we can check the output more reliably.
+///
+/// TODO: test use when running in a different CWD and passing `--manifest-path`
+///       and/or the env var
 #[test]
 #[ignore]
 fn test_playground_lifecycle() {
