@@ -232,29 +232,6 @@ impl ManifestEditor {
                 .unwrap_or(false)
         })
     }
-
-    // pub fn find_bin_name(&self, input_name: &str) -> Option<&str> {
-    //     let canonicalized_input = _canonicalize_name(input_name);
-    //
-    //     self.doc
-    //         .get("bin")?
-    //         .as_array_of_tables()?
-    //         .iter()
-    //         .filter_map(|table| table.get("name"))
-    //         .filter_map(Item::as_str)
-    //         .find(|realname| _canonicalize_name(realname) == canonicalized_input)
-    // }
-
-    // fn _table_to_metadata<'de, T>(
-    //     table: &'de T,
-    // ) -> crate::Result<data::PlaygroundMetadata<'de>>
-    // where
-    //     T: TableLike + IntoDeserializer<'de>,
-    // {
-    //     data::PlaygroundMetadata::deserialize(table.into_deserializer())
-    //         .map_err(crate::Error::from_serde_err)
-    // }
-
     fn _get_str_value<'src>(
         table: &'src impl TableLike,
         key: &'static str,

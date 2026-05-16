@@ -9,7 +9,6 @@ mod manifest_data;
 mod manifest_editor;
 mod ops;
 mod random_names;
-mod script_name_newtype;
 mod util;
 
 // lints / formatting disabled for vendored code

@@ -118,6 +118,7 @@ pub struct BinTable {
     pub name: Option<String>,
     pub path: Option<String>,
 
+    #[serde(default = "Vec::new")]
     pub required_features: Vec<String>,
     pub edition: Option<String>,
 }
@@ -186,9 +187,6 @@ pub struct PackageMetadata {
 pub struct PlaygroundConfig {
     #[serde(default = "_false")]
     pub enabled: bool,
-
-    #[serde(default = "_true")]
-    pub editable: bool,
 
     pub editor_cmd: Option<Vec<String>>,
 
@@ -305,7 +303,6 @@ edition = "252525"
                 metadata: Some(PackageMetadata {
                     cargo_playground: Some(PlaygroundConfig {
                         enabled: true,
-                        editable: true,
                         editor_cmd: Some(vec![_s("delphi"), _s("-p")]),
                         experimental_rfc_3502_scripts: false,
                     }),
