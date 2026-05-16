@@ -9,6 +9,7 @@ pub fn inject_deps(
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
     // ───── Early exits ─────
+    let orig_manifest_content = ctx.manifest_raw()?.to_owned();
     let orig_manifest = ctx.manifest_data()?;
     let orig_script = orig_manifest
         .get_script(&request.script)
@@ -20,7 +21,7 @@ pub fn inject_deps(
     // ───── Actual operations ─────
     // run cargo add if necessary
     let new_ctx =
-        _common::_run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
+        _common::run_cargo_add(&request.deps, &request.cargo_args, ctx)?;
     let paths = new_ctx.project_paths()?;
 
     // update the in-memory Cargo.toml
@@ -32,7 +33,8 @@ pub fn inject_deps(
     )?;
 
     // update it on disk
-    _common::_update_manifest_and_show_diff(
+    _common::update_manifest_and_show_diff(
+        &orig_manifest_content,
         &manifest_editor,
         &paths.cargo_dot_toml,
     )?;

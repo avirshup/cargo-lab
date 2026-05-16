@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use all_the_errors::CollectAllTheErrors;
-use camino::Utf8Path;
 use serde::Deserialize;
 use serde::de::IntoDeserializer;
 use toml_edit::{Array, ArrayOfTables, Item, Table, TableLike, Value};
@@ -29,13 +28,8 @@ impl ManifestEditor {
         Ok(Self { doc })
     }
 
-    // ───── Renderers ─────
     pub fn render(&self) -> String {
         self.doc.to_string()
-    }
-
-    pub fn write(&self, target: &Utf8Path) -> crate::Result<()> {
-        util::write_file(target, &self.render())
     }
 
     // ───── Old methods for testing ────────────────────────────────── //

@@ -34,7 +34,7 @@ pub fn rename_script(
     }
 
     // check paths
-    let new_path = _common::_path_from_script_name(new_name);
+    let new_path = _common::path_from_script_name(new_name);
     if paths.manifest_dir.join(&new_path).exists() {
         return Err(crate::Error::FileErr {
             path: new_path,
@@ -66,7 +66,8 @@ pub fn rename_script(
             &paths.manifest_dir.join(&new_path),
         )?;
     };
-    _common::_update_manifest_and_show_diff(
+    _common::update_manifest_and_show_diff(
+        ctx.manifest_raw()?,
         &manifest_editor,
         &paths.cargo_dot_toml,
     )?;

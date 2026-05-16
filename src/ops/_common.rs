@@ -6,38 +6,38 @@ use crate::global_ctx::GlobalCtx;
 use crate::manifest_editor::ManifestEditor;
 use crate::{data, util};
 
-// ───── Helpers ────────────────────────────────────────────────── //
 /// Create a sensible `bin[].path` value from the script's name.
-pub(super) fn _path_from_script_name(bin_name: &str) -> Utf8PathBuf {
+pub(super) fn path_from_script_name(bin_name: &str) -> Utf8PathBuf {
     Utf8Path::new("src")
         .join(bin_name.replace('-', "_"))
         .with_extension("rs")
 }
 
-pub(super) fn _update_manifest_and_show_diff(
+/// utility function for committing changes to Cargo.toml.
+///
+/// TODO: this needs to have output control
+///     (verbosity, out vs err, color)
+pub(super) fn update_manifest_and_show_diff(
+    orig_content: &str,
     toml: &ManifestEditor,
     target: &Utf8Path,
 ) -> crate::errors::Result<()> {
-    // back it up first
+    // render the toml, see if we even need to do anything
+    let new_content = toml.render();
+    if orig_content == new_content {
+        // early return if content is unchanged
+        println!("No changes to Cargo.toml.");
+        return Ok(());
+    }
+
+    // create backup then overwrite
     let backup = target.with_added_extension("bak");
     util::copy_file(target, &backup)?;
+    util::write_file(target, &new_content)?;
 
-    // overwrite cargo.toml
-    toml.write(target)?;
+    println!("Updated Cargo.toml: ");
+    util::display_file_diff(orig_content, &new_content);
 
-    // TODO: better output if cargo.toml didn't change
-    eprintln!("Updated Cargo.toml: ");
-
-    let mut cmd = process::Command::new("diff");
-    cmd.current_dir(target.parent().unwrap())
-        .arg("--color=always") // TODO: this should be controlled globally
-        .args([backup.file_name().unwrap(), target.file_name().unwrap()]);
-    util::show_invocation(&cmd);
-
-    // we are ignoring any failure to run `diff` here
-    // since it's only for illustrative purpose
-    // and the file has already been modified
-    let _ = util::run_subproc(cmd);
     Ok(())
 }
 
@@ -45,7 +45,7 @@ pub(super) fn _update_manifest_and_show_diff(
 /// and then returns a new context (to read the updated Cargo.toml).
 ///
 /// Othewise returns the original context without changes.
-pub(super) fn _run_cargo_add(
+pub(super) fn run_cargo_add(
     deps: &[data::DepRequest],
     cargo_add_args: &[String],
     ctx: GlobalCtx,
@@ -81,7 +81,7 @@ pub(super) fn _run_cargo_add(
 }
 
 /// Built-in template for a minimal script
-pub(super) fn _init_minimial_script(name: &str) -> String {
+pub(super) fn minimal_script(name: &str) -> String {
     format!(
         r#"// playground script: {name}
 
