@@ -19,7 +19,6 @@ mod vendor_cargo;
 
 #[cfg(feature = "experimental_cargo_script_rfc3502")]
 mod cargo_script;
-mod project_checker;
 mod templates;
 
 use std::process::ExitCode;
@@ -165,7 +164,7 @@ fn run(args: cli::MainCli) -> Result<()> {
 
         // mostly for debugging/testing. (should be hidden from CLI help)
         cli::SubCmd::Check => {
-            project_checker::check_config(ctx)?;
+            ops::check_project(ctx)?;
         },
     };
 

@@ -42,7 +42,7 @@ pub fn print_completion_script(
     // this _might_ be cargo itself, or it might be this binary.
     let cmd = match &invocation {
         InvocationType::CargoSubcmd { cargo_exe, .. } => cargo_exe,
-        InvocationType::Direct() => &arg0,
+        InvocationType::Direct(exe) => exe,
     }
     .file_name()
     .expect("cmd has recognizeable filename");
