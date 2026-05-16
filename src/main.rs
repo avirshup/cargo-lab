@@ -9,6 +9,7 @@ mod manifest_data;
 mod manifest_editor;
 mod ops;
 mod random_names;
+mod templates;
 mod util;
 
 // lints / formatting disabled for vendored code
@@ -18,7 +19,6 @@ mod vendor_cargo;
 
 #[cfg(feature = "experimental_cargo_script_rfc3502")]
 mod cargo_script;
-mod templates;
 
 use std::process::ExitCode;
 use std::{env, io};
@@ -63,18 +63,17 @@ fn run(args: cli::MainCli) -> Result<()> {
 
     if verbosity >= global_ctx::Debug {
         eprintln!("ARGV: {:?}", env::args());
-        // eprintln!("env vars: {:?}", env::vars());
+        eprintln!("env vars: {:?}", env::vars());
         eprintln!("Parsed args: {args:#?}");
     }
 
     let ctx = GlobalCtx::new(verbosity, args.global_args.manifest_path.clone());
     match args.cmd {
         cli::SubCmd::InitPlayground(cli::InitPlayground {
-            path: path_str,
+            path,
             name: input_name,
             edition,
         }) => {
-            let path = path_str;
             let name: String = input_name.unwrap_or_else(|| {
                 path.file_name().expect("non-empty filename").into()
             });
@@ -82,16 +81,9 @@ fn run(args: cli::MainCli) -> Result<()> {
             ops::init_new_playground(&path, &name, &edition, ctx)?;
         },
 
-        cli::SubCmd::RunScript(cli::RunScript {
-            script_name: bin_name,
-            args,
-        }) => {
-            ops::run_script(&bin_name, &args, ctx)?;
+        cli::SubCmd::RunScript(cli::RunScript { script_name, args }) => {
+            ops::run_script(&script_name, &args, ctx)?;
         },
-        // alternate form what doesn't work rn
-        // cli::SubCmd::RunScript(cli::RunScript { args }) => {
-        //     ops::run_script(&args[0], &args[1..], ctx)?;
-        // },
         cli::SubCmd::NewScript(cli::NewScript {
             script_name,
             opts:
@@ -124,11 +116,11 @@ fn run(args: cli::MainCli) -> Result<()> {
         },
 
         cli::SubCmd::RenameScript(cli::RenameScript {
-            old_name: script_name,
+            old_name,
             new_name,
             edit,
         }) => {
-            ops::rename_script(&script_name, &new_name, edit, ctx)?;
+            ops::rename_script(&old_name, &new_name, edit, ctx)?;
         },
 
         cli::SubCmd::ListScripts => {
@@ -140,19 +132,19 @@ fn run(args: cli::MainCli) -> Result<()> {
         },
 
         cli::SubCmd::InjectDeps(cli::InjectDeps {
-            script_name: bin_name,
+            script_name,
             inject_args,
             edit,
         }) => {
-            let request = _build_script_request(bin_name, inject_args)?;
+            let request = _build_script_request(script_name, inject_args)?;
             ops::inject_deps(&request, edit, ctx)?;
         },
 
         cli::SubCmd::EditScript(cli::EditScript {
-            script_name: bin_name,
+            script_name,
             editor_cmd,
         }) => {
-            ops::edit_script(&bin_name, &editor_cmd, ctx)?;
+            ops::edit_script(&script_name, &editor_cmd, ctx)?;
         },
 
         cli::SubCmd::WriteCompletionScript(cli::WriteCompletionScript {
@@ -161,7 +153,6 @@ fn run(args: cli::MainCli) -> Result<()> {
             cli::print_completion_script(&shell, io::stdout())?;
         },
 
-        // mostly for debugging/testing. (should be hidden from CLI help)
         cli::SubCmd::Check => {
             ops::check_project(ctx)?;
         },

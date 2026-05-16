@@ -10,9 +10,10 @@ use crate::manifest_data::{ManifestData, PlaygroundConfig};
 use crate::manifest_editor::ManifestEditor;
 use crate::{data, util};
 
+pub const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
+
 #[cfg(feature = "xtask")]
 const ENV_XTASK_MANIFEST_PATH: &str = "CARGO_MANIFEST_DIR";
-pub const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Verbosity {
@@ -103,7 +104,7 @@ impl GlobalCtx {
     }
 
     /// Creates a new context with custom project paths
-    pub fn with_paths(&self, paths: ProjectPaths) -> GlobalCtx {
+    pub fn with_paths(&self, paths: ProjectPaths) -> Self {
         Self {
             verbosity: self.verbosity,
             cwd: self.cwd.clone(),
@@ -120,7 +121,7 @@ impl GlobalCtx {
     ///
     /// Note this is still lazy so it doesn't actually re-read the manifest from disk
     /// until requested. But it at least doesn't need to re-do the manifest discovery parts..
-    pub fn reload(&self) -> GlobalCtx {
+    pub fn reload(&self) -> Self {
         Self {
             verbosity: self.verbosity,
             cwd: self.cwd.clone(),
