@@ -12,7 +12,7 @@ use crate::{data, global_ctx, util};
 /// We don't actually call `cargo init` for now, just
 /// write out the initial manifest ourselves.
 ///
-/// ## How `cargo init` is implemented
+/// ## Notes: `cargo init`'s implementaiton
 ///  `cargo init`'s help string says
 /// "Create a new cargo package in an existing directory".
 ///
@@ -135,16 +135,14 @@ fn _usage_tips(manifest_dir_abspath: &str) -> String {
     let env_var = global_ctx::CARGO_PLAYGROUND_MANIFEST_DIR;
     cformat!(
         r#"Tips:
- 1) For enabling autocomplete, see `<cyan>cargo playground help completions</>`
+ 1) To enable tab-completion, run `<cyan>cargo playground completions --help</>`
  2) To access this playground from any working directory, set
     `<cyan>{env_var}={manifest_dir_abspath}</cyan>`
     or use the `--manifest-path` flag
     (`<cyan>cargo playground --manifest-path={manifest_dir_abspath}</>`).
- 3) You can alias the command to something shorter, either by
-    - in `<blue>~/.cargo/config.toml</>`, set <cyan>
-        [aliases]
-        pg = "playground"</>
-    - or, set a shell alias (e.g., `<cyan>alias cpg="cargo playground"</>`).
+ 3) To alias the command to something shorter, use a shell alias
+    (e.g., `<cyan>alias cpg="cargo playground"</>`);
+    tab-completion won't (for now) work with cargo aliases in config.toml.
     "#
     )
 }

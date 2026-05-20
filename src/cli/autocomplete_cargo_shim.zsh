@@ -2,7 +2,7 @@
     NOTE: this is a jinja template, rendered in completion_script.rs
 #}
 # ───── Setup ──────────────────────────────────────────────────── #
-_registered_completion_fn() {
+_zsh_registered_completion_fn() {
   # Get the completion function registered for a given command, if it exists
   # Prints nothing if it doesn't exist.
 
@@ -14,7 +14,7 @@ _registered_completion_fn() {
 }
 
 # ───── The actual completion function ─────────────────────────────────── #
-_CARGO_PG_PARENT_COMPLETER=$(_registered_completion_fn "{{cmd}}")
+_CARGO_PG_PARENT_COMPLETER=$(_zsh_registered_completion_fn "{{cmd}}")
 
 _complete_cargo_pg_combined() {
   if test -n "$_CARGO_PG_PARENT_COMPLETER"; then
@@ -24,9 +24,11 @@ _complete_cargo_pg_combined() {
   _clap_dynamic_completer_{{name}} "$@"
 }
 
-# ───── Registration ───────────────────────────────────────────── #
-# clap complete script
+# START: script emitted from clap::CompleteEnv
 {{clap_completion_script}}
+# END: script emitted from clap::CompleteEnv
 
+
+# ───── Registration ───────────────────────────────────────────── #
 # *override* clap script's registration with our "combined" provider
 compdef _complete_cargo_pg_combined {{cmd}}

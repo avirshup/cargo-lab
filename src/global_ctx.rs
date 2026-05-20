@@ -302,11 +302,11 @@ impl ProjectPaths {
             .to_owned()
     }
 
-    // ───── Directory traversel ────────────────────────────────────── //
+    // ───── Directory traversal ────────────────────────────────────── //
     /// Iterate over templates found in the template dir, if it exists
     ///
     /// Note that this currently ignores any errors if the initial
-    /// `read_dir` call is succesful.
+    /// `read_dir` call is successful.
     pub fn iter_templates(
         &self,
     ) -> crate::Result<impl Iterator<Item = data::ScriptTemplate>> {
@@ -318,7 +318,7 @@ impl ProjectPaths {
             )
         })?;
 
-        // match all filies in the template directy named "X.rs.template" and turn
+        // match all files in the template direct named "X.rs.template" and turn
         // them into ScriptTemplate structs. Currently just ignores any entries
         // that we fail to read
         Ok(dir_reader
