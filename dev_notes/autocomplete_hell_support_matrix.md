@@ -89,11 +89,39 @@ bash-5.3$ echo $?
 1
 ```
 
-For our purposes, ~~it hopefully suffices to just create a new function
-that executes both the old _and_ new bash functions?~~ LOL of course not.
-Weirdly, even if I call the `_clap_complete_cooperatively` function _first_,
+For our purposes, it hopefully suffices to just create a new function
+that executes both the old _and_ new bash functions? LOL of course not.
+~~Weirdly, even if I call the `_clap_complete_cooperatively` function _first_,
 I still only get cargo autocomplete. Maybe there's a stream being consumed
-or something, fuck I don't know.
+or something, fuck I don't know.~~
 
-(Interestingly the bash completions do somehow seem to include aliases from
-`.cargo/config.toml`, not sure how that's happening)
+Unlike fish, bash completion provider functions set possible values in the COMPREPLY
+_array_ (wait can it be a dictionary too?). So to combine autocompletions,
+you call both functions and merge their `COMPREPLY`s. Yep this works.
+
+# ZSH
+
+In zsh, you set up lazy-loaded autocompletions for `$cmd` by
+by putting a script named `_$cmd` in a directory in the `fpath`
+(function search path) array. The first line should be
+`#compdef $cmd`, then it defines a completion function `$fn`, then registers
+that function with `compdef $fn $cmd`.
+
+Note they can also be sourced normally (and in this case the `#compdef $cmd`
+at the top is not necessary).
+
+In zsh, completion provider functions use _callbacks_ to set up the
+completions (e.g., they call
+`describe [...]` to register their completion options.) So to combine them,
+they just need to be called in order.
+
+Except for the added wrinkle of possible lazy-loading, this should
+be pretty similar to the bash setup - detect if bash has a completion
+command already registered and make a new function to merge
+its results with ours.~
+
+~~**Oh wait** - zsh is actually the easiest one here:~~
+Oh wait oh wait ... zsh seems to _cache_ completions in a way that persists
+past shell sessions, so it's incredibly hard to test.
+
+- like fish, you can have multiple

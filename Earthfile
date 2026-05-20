@@ -1,6 +1,6 @@
 VERSION 0.8
 
-FROM rust:1.94.1-slim
+FROM rust:1.96.0-slim
 
 # pre-built rust commands
 # https://github.com/earthly/lib/tree/main/rust
@@ -10,6 +10,11 @@ all:
     BUILD +check
     BUILD +test
     BUILD +test-e2e
+
+
+# ──────────────────────────────────────────────────────────────────────── #
+# ───── Environments                                                 ───── #
+# ──────────────────────────────────────────────────────────────────────── #
 
 # ───── Base environment setup ─────────────────────────────────── #
 build-env:
@@ -22,27 +27,20 @@ build-env:
         rustfmt
     RUN rustup component add \
         --toolchain=nightly rustfmt
-    RUN apt-get update --quiet=2 \
+    RUN --mount type=cache,target=/var/cache/apt/archives \
+        --mount type=cache,target=/var/lib/apt/lists \
+        apt-get update --quiet=2 \
      && apt-get install --no-install-recommends --quiet --yes \
-        autoconf \
-        autotools-dev \
-        bsdmainutils \
-        clang \
-        cmake \
-        git \
-        libtool-bin \
-     && rm -rf /var/lib/apt/lists/*
-
-    # cargo setup
+        curl \
+        git
     DO rust+INIT --keep_fingerprints=true
     ENV CARGO_TERM_COLOR=always
-    ENV RUSTFLAGS="-Dwarnings"
-    DO rust+CARGO --args="install --locked \
-        cargo-deny \
-        cargo-edit"
 
-src-tree-prep:
+
+crate:
     FROM +build-env
+    COPY +build-cargo-set-version/cargo-set-version $CARGO_HOME/bin/
+
     ARG build_tag=""
     # Checks out specific tag if requested,
     # sets version in Cargo.toml, then exports the minimal tree
@@ -58,65 +56,153 @@ src-tree-prep:
     ENV CRATE_VERSION=$(git describe --dirty --tags)
 
     DO rust+CARGO --args="set-version \"$CRATE_VERSION\""
+    DO rust+CARGO --args="package --allow-dirty" \
+        --output="package/.*"
 
-    # Prep dir for export
-    # There's no way (AFAICT) to use .earthlyignore here, so it's easiest
-    # to just remove the files we don't wannt
-    RUN rm -rf .git \
-     && rm -r dev_notes Earthfile .earthlyignore
-    RUN echo "$CRATE_VERSION" > VERSION  # gotta pass information somehow
-    SAVE ARTIFACT --keep-ts ./ project
+    RUN echo "$CRATE_VERSION" > VERSION
 
-    # WARNING: The following commands have different copy semantics!
-    #   "SAVE ARTIFACT ." -> "COPY +target/ dest"
-    #   will always copy to *a new folder* called "dest/project" (assuming
-    #   the source directory was named "project".)
-    #
-    #   "SAVE ARTIFACT . somename" -> "COPY +target/somename dest"
-    #   will *merge* the contents of the source directory _into_ dest.
-    #
-    #   (Noting this here because this has confused me for *years* and
-    #   I just figured out what's going on)
+    # artifacts for other steps
+    SAVE ARTIFACT "VERSION"
+    SAVE ARTIFACT "./target/package/cargo-playground-${CRATE_VERSION}" crate-src
+    SAVE ARTIFACT --keep-ts \
+        "./target/package/cargo-playground-${CRATE_VERSION}.crate" \
+        "cargo-playground.crate"
+
+    # output the crate (when this target is built directly)
+    SAVE ARTIFACT "./target/package/cargo-playground-${CRATE_VERSION}.crate" \
+        AS LOCAL "./artifacts/package/"
+
+
+SETUP_CRATE_TREE:
+    FUNCTION
+    # Copies the cleaned source tree into the current directory.
+    # (This makes it easy to copy it in at an arbitrary layer
+    # for caching purposes)
+
+    COPY +crate/VERSION /tmp/VERSION
+    ENV CRATE_VERSION=$(cat /tmp/VERSION)
+    COPY --keep-ts +crate/crate-src ./
 
 src:
     FROM +build-env
-    # Image layer w/ prepped source tree
+    DO +SETUP_CRATE_TREE
 
-    # For caching purposes we _copy_ this from +src-tree-prep
-    # so changes to irrelevant files (such as everything in .git) won't
-    # invalidate image layers.
-    COPY --keep-ts +src-tree-prep/project ./
-    ENV CRATE_VERSION=$(cat VERSION)
 
-# ───── Testing ────────────────────────────────────────────────── #
-check:
+# ───── Test environments ──────────────────────────────────────── #
+shell-testing-env:
+    # Earthly's `rust+INIT` function somehow causes cargo's autocomplete
+    # to emit things that look like escaped renderings
+    # of ANSI control codes into the autocomplete results.
+    # (e.g., `^[[1m^[[96m`)
+    # So don't use any cargo commands that need the cache here ...
+    FROM +base
+
+    RUN --mount type=cache,target=/var/cache/apt/archives \
+        --mount type=cache,target=/var/lib/apt/lists \
+        apt-get update --quiet=2 \
+     && apt-get install --no-install-recommends --quiet --yes \
+        bash \
+        bash-completion \
+        fish \
+        zsh
+
+    RUN useradd \
+        --uid 1002 \
+        --create-home \
+        --shell /bin/bash \
+        testuser
+    USER testuser
+    WORKDIR /home/testuser
+
+    # ZSH setup
+    RUN echo 'fpath+=~/.zfunc' > .zshrc \
+     && echo 'autoload -U compinit; compinit' >> .zshrc \
+     && mkdir -p .zfunc \
+     && rustup completions zsh cargo > .zfunc/_cargo
+
+    # bash setup
+    # (Note it will have already pre-populated .bashrc, including bash-completions)
+    COPY tests/shell/show-completions.bash ./helpers/  # helper script to test completions
+    RUN test -f .bashrc \
+     && echo 'source <(rustup completions bash cargo)' >> .bashrc \
+     && echo '. "$HOME/helpers/show-completions.bash"' >> .bashrc
+
+    # fish setup (just run it once to initialize config)
+    # no need to install cargo completions, they come w/ fish
+    RUN mkdir -p ~/.config/fish/completions
+
+autocomplete-env:
+    FROM +shell-testing-env
+
+    COPY +exe/cargo-playground $CARGO_HOME/bin
+
+    USER testuser
+    WORKDIR $HOME
+
+    # direct call setup
+    RUN echo 'source <(cargo-playground completions bash)' >> .bashrc
+    RUN cargo-playground completions zsh >> .zshrc
+    RUN cargo-playground completions fish > .config/fish/completions/cargo-playground.fish
+
+    # cargo subcmd setup
+    RUN echo 'source <(cargo playground completions bash)' >> .bashrc
+    RUN cargo playground completions zsh >> .zshrc
+    RUN cargo playground completions fish > .config/fish/completions/cargo.fish
+
+
+# ──────────────────────────────────────────────────────────────────────── #
+# ───── Tests and checks                                             ───── #
+# ──────────────────────────────────────────────────────────────────────── #
+tests:
+    # tests *all* the things
+    WAIT
+        BUILD +lints
+        BUILD +dep-check
+        BUILD +test-unit
+    END
+    BUILD +test-e2e
+    BUILD +test-autocomplete
+
+lints:
     FROM +src
+    ENV RUSTFLAGS="-Dwarnings"
+
+    COPY rustfmt.toml .
 
     # rust lints
     DO rust+CARGO --args="check"
     DO rust+CARGO --args="+nightly fmt --check -v"
     DO rust+CARGO --args="clippy -v"
+
+
+dep-check:
+    FROM +build-env
+    COPY +build-cargo-deny/cargo-deny $CARGO_HOME/bin/
+    DO +SETUP_CRATE_TREE
+
     DO rust+CARGO --args="deny -L info check"
 
-    # worth checking for as I keep screwing it up
-    COPY Earthfile .
-    IF grep -E '^ +RUN cargo' Earthfile
-        RUN echo 'In Earthfile: use "DO rust+CARGO", not "RUN cargo"';\
-         exit 1
-    END
+test-unit:
+    FROM +build-env
+    ENV RUSTFLAGS="-Dwarnings"
 
-test:
-    FROM +src
+    DO +SETUP_CRATE_TREE
     DO rust+CARGO --args="test"
 
 test-e2e:
     FROM +src
     DO rust+CARGO --args="test -- --ignored"
 
-# TODO: `cargo install` it then run the e2e tests in situ
+test-autocomplete:
+    FROM +autocomplete-env
+    COPY tests/shell/test_shell_completion_integration.sh ./
+    RUN bash test_shell_completion_integration.sh
 
-# ───── Outputs ────────────────────────────────────────────────── #
-build:
+
+# ──────────────────────────────────────────────────────────────────────── #
+# ───── Outputs                                                      ───── #
+# ──────────────────────────────────────────────────────────────────────── #
+exe:
     FROM +src
     ARG profile="release"
     ARG BIN_NAME="cargo-playground"
@@ -127,6 +213,7 @@ build:
     RUN test -e target/$profile/$BIN_NAME
 
     LET BIN_TARGET="$(rustc --print host-tuple)/${BIN_NAME}-${CRATE_VERSION}-${profile}"
+    SAVE ARTIFACT target/$profile/$BIN_NAME cargo-playground
     SAVE ARTIFACT \
         target/$profile/$BIN_NAME \
         AS LOCAL \
@@ -134,7 +221,8 @@ build:
 
 
 publish:
-    FROM +src
+    FROM +build-env
+    DO +SETUP_CRATE_TREE
     ARG build_tag=""
     ARG live="--dry-run"
 
@@ -159,3 +247,15 @@ publish:
     RUN --push \
         --secret CARGO_REGISTRY_TOKEN=apitoken \
         cargo publish $live --allow-dirty
+
+
+# ───── Helpers and utils ──────────────────────────────────────── #
+build-cargo-set-version:
+    FROM +build-env
+    DO rust+CARGO --args="install --locked cargo-edit"
+    SAVE ARTIFACT "$CARGO_HOME/bin/cargo-set-version"
+
+build-cargo-deny:
+    FROM +build-env
+    DO rust+CARGO --args="install --locked cargo-deny"
+    SAVE ARTIFACT "$CARGO_HOME/bin/cargo-deny"
