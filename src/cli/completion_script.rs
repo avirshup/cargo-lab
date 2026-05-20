@@ -1,4 +1,4 @@
-use std::{env, io};
+use std::io;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use clap_complete::env::Shells;
@@ -23,47 +23,61 @@ pub fn print_completion_script(
     shell_name: &str,
     mut dest: impl io::Write,
 ) -> crate::Result<()> {
-    // ───── Part 1: figure out what paths to use in the script ─────
+    // ───── Part 1: gather all the different paramters we need ─────
     let invocation = InvocationType::from_env();
 
     // path to this specific executable, which
     // will _generate_ the completions
-    // here, this is always _this binary_ (not ever cargo itself)
-    let arg0 = Utf8PathBuf::from(env::args().next().expect("argv[0]"));
-    let this_exe = _cmd_or_canonical_path(&arg0);
-    let completion_generator = this_exe.as_str();
-
-    // an identifier for the command
-    // (only used for namespacing in the generated shell script,
-    // does not affect anything else AFAICT)
-    let name = arg0.file_name().expect("arg0 is a file path");
+    let this_exe = _cmd_or_canonical_path(invocation.this_exe());
+    let completion_generator_cmd = this_exe.as_str();
 
     // the command to generate completions _for_
     // this _might_ be cargo itself, or it might be this binary.
-    let cmd = match &invocation {
-        InvocationType::CargoSubcmd { cargo_exe, .. } => cargo_exe,
-        InvocationType::Direct(exe) => exe,
-    }
-    .file_name()
-    .expect("cmd has recognizeable filename");
+    let cmd = invocation.invoked_cmd();
 
-    // ───── Part 2: ask clap to please print out the script now ─────
-    Shells::builtins()
+    // an identifier for the command (rn just the same as the command)
+    // (only used for namespacing in the generated shell script,
+    // does not affect anything else AFAICT)
+    let name = cmd;
+
+    // ───── Part 2: build completer, add customizations, and print─────
+    let builtins = Shells::builtins();
+    let completer = builtins
         .completer(shell_name)
-        .ok_or_else(|| crate::Error::UnknownShell(shell_name.to_owned()))?
-        .write_registration(
-            invocation.env_var_name(),
+        .ok_or_else(|| crate::Error::UnknownShell(shell_name.to_owned()))?;
+
+    // this is an IIFE so I can use the try operator
+    || -> io::Result<()> {
+        // additions to autocomplete scripts to handle use as a cargo subcmd
+        if let InvocationType::CargoSubcmd { .. } = &invocation {
+            // TODO: bash / zsh ... if it's even possible
+
+            // FOR FISH: special pre-script to ensure that the normal cargo
+            // completions get loaded too, if available.
+            // Why? Because when _lazy-loading_ autocompletions, fish stops
+            // looking after the first one it finds, so if it finds *our* "cargo.fish"
+            // then it won't also load the built-in `cargo.fish`.
+            if completer.name() == "fish" {
+                writeln!(dest, include_str!("autocomplete_helper.fish"))?;
+                writeln!(dest, "__load_lazy_completions \"{cmd}\"\n")?;
+            }
+        }
+
+        // ───── Part 3: ask clap to please print out the script now ─────
+        completer.write_registration(
+            invocation.completion_env_var(),
             name,
             cmd,
-            completion_generator,
+            completion_generator_cmd,
             &mut dest,
         )
-        .map_err(|ioerr| {
-            crate::ioerr!(
-                ioerr,
-                "Failed to write completion script for shell '{shell_name}'"
-            )
-        })
+    }()
+    .map_err(|ioerr| {
+        crate::ioerr!(
+            ioerr,
+            "Failed to write completion script for '{shell_name}'"
+        )
+    })
 }
 
 /// Determine if `path` is a command on the $PATH or a filesystem path

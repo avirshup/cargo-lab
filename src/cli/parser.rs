@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use clap::builder::Styles;
 use clap::{Args, Command, Parser, Subcommand};
-use color_print::cformat;
+use color_print::{cformat, cstr};
 
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
@@ -165,31 +165,6 @@ pub struct RunScript {
     pub args: Vec<String>,
 }
 
-// // alternate form that consumes ALL arguments after the script
-// // name, even `--help` (probably). HOWEVER it doesn't work
-// // with the current version of clap_complete (possibly a bug
-// // with how `ValueCompleter::complete_at` is called?),
-// // and also the help string sucks
-// /// Run an existing script from the playground
-// #[apply(DeriveArg)]
-// #[derive(Args)]
-// pub struct RunScript {
-//     // /// Script to run
-//     // #[arg(
-//     //         add = script_name_completer(),
-//     //         value_name = "SCRIPT"
-//     // )]
-//     // pub script_name: String,
-//     /// Script and arguments
-//     #[arg(
-//         allow_hyphen_values = true,
-//         trailing_var_arg = true,
-//         num_args = 1..,
-//         add = script_name_as_first_element_completer(),
-//     )]
-//     pub args: Vec<String>,
-// }
-
 /// Create a new playground script
 #[apply(DeriveArg)]
 #[derive(Args)]
@@ -300,7 +275,7 @@ pub struct EditScript {
 pub struct WriteCompletionScript {
     // TODO: list supported shells (
     // see `clap_complete::env::Shells::builtins()`)
-    /// Shell name ('bash' / 'fish' / etc.)
+    /// Shell name (bash, fish, and zsh are officially supported)
     #[arg()]
     pub shell: String,
 }
@@ -318,26 +293,44 @@ impl WriteCompletionScript {
     fn add_after_help_examples(cmd: Command) -> Command {
         let invocation = InvocationType::from_env();
 
+        let invoked_cmd = invocation.invoked_cmd();
+
         // `get_bin_name()` is not the bin name, it
         // actually returns the bin name _with the subcommand already appended to it_
         // (e.g., "cargo-playground completions")
         let this_cmd =
             cmd.get_bin_name().unwrap_or("cargo-playground completions");
 
-        let invocation_exe = match &invocation {
-            InvocationType::CargoSubcmd { cargo_exe, .. } =>
-                cargo_exe.file_name().unwrap(),
-            InvocationType::Direct(exe) => exe.file_name().unwrap(),
+        let bash_and_zsh_caveat = match &invocation {
+            InvocationType::CargoSubcmd { .. } => cstr!(
+                r#"
+<yellow>warning:</> this may conflict with autocompletions already active for <cyan>cargo</>.
+(As a workaround, try calling the executable directly instead of through cargo)"#
+            ),
+            InvocationType::Direct(_) => "",
         };
 
         let helpstr = cformat!(
-            r#"
-To activate the command line completions for *the current session*, run
-   `<cyan>{this_cmd} <<SHELL>> | source</>`
+            r#"This command emits <italic>shell scripts</> that can be used to enable dynamic tab completion in various shells.
 
-To permanently activate autocomplete, add the above line to your shell's
-startup script, or add it to the "<blue>{invocation_exe}</>" entry in your shell's
-completion script registry (if it has one).
+To activate completions for your shell:
+
+<bold,underline>Fish:</>
+To activate completions for the current session:
+
+  $ <bright-cyan,bold>{this_cmd} fish | source</>
+
+To lazily load these completions for every session, run
+
+  $ <bright-cyan,bold>{this_cmd} fish > ~/.config/fish/completions/{invoked_cmd}.fish</>
+
+<bold,underline>Bash/zsh:</>
+To activate completions for the current session, either:
+
+  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
+or
+  $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
+{bash_and_zsh_caveat}
 "#
         );
 

@@ -1,10 +1,3 @@
-# A thought
-
-Config management has certain simliarities to the problems
-of cache invalidation and naming things.
-Esp when your process, as a user-friendly tool,
-needs to be able to edit and update its own config ...
-
 # In-memory manifest lifecycle
 
 So, our commands both:
@@ -251,3 +244,26 @@ a schema](https://github.com/rust-lang/cargo/blob/3185f58bbb76877cb80a8d39225eb7
 ### How we can do it here
 
 - steal (a subset) of the official cargo
+
+### Deep thoughts
+
+- Config management has certain ... simliarities ... to the problemss
+  of cache invalidation and naming things. (Esp when your process, as a user-friendly tool,
+  needs to be able to edit and update its own config ...)
+- On code re-use and abstraction: probably don't abstract something you only need once.
+  BUT "once" can be temporal, not just spatial. E.g., for a problem where you're trying
+  multiple approaches, an abstraction is very helpful _even
+  if_ any given snapshot of the code only actually uses it once?
+    - It's basically scaffolding for prototying in this case ... Do you keep it
+      around afterwards, as reified knowledge, or throw it away and
+      remove the scaffolding once you're done? (theoretically you
+      could always retrieve the abstraction later from the repo's
+      history if you can find it again).
+    - Probably comes
+      down to how much YAGNI and premature generalization is present +
+      and the cost of maintaining it vs. the semantic value of keeping
+      it around.
+    - If removing it, probably leave a comment somewhere pointing to a
+      a commit it can be rescued from if you need it again?
+      Generalizes to the usual problem of what to do with dead code that you
+      may reasonably need later but not right now.

@@ -62,3 +62,38 @@ dimensional space, *everything* is an edge case).
 Good news:
 `@epage` maintains a library for this:
 `[completest](https://docs.rs/completest-pty/latest/completest_pty/)`.
+
+# Cooperative autocomplete in bash
+
+Unlike fish, `bash` (and `zsh`) appear to only allow
+a single completion provider per command. So activating
+completions for `cargo playground` (and other tools like `cargo tauri` too)
+will override the completions for `cargo` (and each other).
+
+Fix is probably to make the scripts cooperate?
+In bash, can use `complete -p` to show if there is a provider associated
+with the command.
+
+`bash` associates a completion function w/ a command via
+`complete [options] -F (function) (cmd)`; this overwirtes any previous completion.
+
+To see if there are previous completions registered:
+
+```console session
+bash-5.3$ complete -p cargo
+complete -F _cargo cargo
+
+bash-5.3$ complete -p does-not-exist
+bash: complete: does-not-exist: no completion specification
+bash-5.3$ echo $?
+1
+```
+
+For our purposes, ~~it hopefully suffices to just create a new function
+that executes both the old _and_ new bash functions?~~ LOL of course not.
+Weirdly, even if I call the `_clap_complete_cooperatively` function _first_,
+I still only get cargo autocomplete. Maybe there's a stream being consumed
+or something, fuck I don't know.
+
+(Interestingly the bash completions do somehow seem to include aliases from
+`.cargo/config.toml`, not sure how that's happening)

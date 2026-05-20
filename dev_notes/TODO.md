@@ -6,6 +6,41 @@
     - user's chosen IDE, and
     - what a CLI tool can do
 
+### Bugs
+
+- [x] BUG: passing arguments to scripts via doesn't work
+  (`cargo playground run $scriptname -- $args` should work)
+
+- autocomplete:
+    - [x] BUG: "global" arguments are suggested w/ base "cargo" cmd, that ain't right
+        - WHY? because `cargo playground generate` generates completions for bare
+          `cargo` itself I guess?
+    - [x] `cargo play[tab]` does not autocomplete even though
+      `cargo playground [args] [tab]` does
+    - [ ] It should work with cargo aliases (if u set `[alias] pg = "playground"`
+      then `cargo pg [tab]` should still work)
+        - This _used to_ work! I tested it! Why doesn't it work anymore?
+        - Oh - it's because we now check to ensure that we're really running
+          the correct cargo subcmd before generating completions ... but that
+          doesn't work if there's an alias.
+        - To fix: currently can check `CARGO_ALIAS_$(to-upper subcmd)` and, if that's
+          not set, check output of `cargo --list`. Unfortunately the latter is not
+          _really_ designed to be machine-readable and there may be escaping problems.
+          The latter will definitely be pretty slow unfortunately.
+        - Fix when stable: can run
+          `cargo +nightly -Z unstable-options config get alias.$subcmd`
+    - [ ] in `bash` (and `zsh`)
+      `source <(cargo playground completions bash)` overrides
+      the effect of `source <(rustup completions bash cargo)`, and vice versa.
+
+- [ ] `cargo playground [args] &| cat` should not contain
+  ANSI color by default (because output not a TTY)
+    - [x] `cargo playground &| cat`,
+      `cargo playground help &| cat` (clap automatically
+      determines whether to use color)
+    - [ ] `cargo playground list &| cat` (and all other subccommands really)
+        - related but not relevant: [see the TIL here](https://stackoverflow.com/a/79614957/1958900).
+
 ## "Goal one" milestones
 
 - [x] **cli**: autocomplete
@@ -128,28 +163,6 @@
 ## Functionality
 
 - [ ] Alfred workflow W/ same autocomplete support as terminal (for me anyway)
-
-### Bugs
-
-- [x] it should work to pass arguments to script via
-  `cargo playground run $scriptname -- $args`
-
-- [ ] `cargo playground [args] &| cat` should not contain
-  ANSI color by default (because output not a TTY)
-    - [x] `cargo playground &| cat`,
-      `cargo playground help &| cat` (clap automatically
-      determines whether to use color)
-    - [ ] `cargo playground list &| cat` (and all other subccommands really)
-        - related but not relevant: [see the TIL here](https://stackoverflow.com/a/79614957/1958900).
-
-- autocomplete:
-    - [x] BUG: "global" arguments are suggested w/ base "cargo" cmd, that ain't right
-        - WHY? because `cargo playground generate` generates completions for bare
-          `cargo` itself I guess?
-    - [x] `cargo play[tab]` does not autocomplete even though
-      `cargo playground [args] [tab]` does
-    - [ ] It should work with cargo aliases (if u set `[alias] pg = "playground"`
-      then `cargo pg [tab]` should still work)
 
 ### Cargo script support?
 
