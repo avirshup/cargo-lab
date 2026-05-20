@@ -9,7 +9,7 @@ pub mod common;
 use common::*;
 
 /// Ensure the completion scripts generators
-/// correctly detect the invocation method
+/// correctly detect direct invocations
 #[test]
 fn test_completion_scripts_for_direct_invocation() {
     let tempdir = ScratchDir::new();
@@ -24,6 +24,8 @@ fn test_completion_scripts_for_direct_invocation() {
     }
 }
 
+/// Ensure the completion scripts generators
+/// correctly detect cargo subcommand invocations
 #[test]
 fn test_completion_scripts_for_subcmd_invocation() {
     let tempdir = ScratchDir::new();
@@ -88,8 +90,15 @@ fn test_subcommand_name_autocomplete_for_subcmd_invocation() {
     }
 }
 
+/// Tests the results when invoked with the autocomplete
+/// env vars set to "fish".
+///
+/// Note this definitely
+/// DOES NOT test the shell integration itself,
+/// just that our program generates the expected
+/// completions when called correctly.
 #[test]
-fn test_dynamic_autocomplete() {
+fn test_dynamic_autocomplete_mode_for_fish() {
     // set up a new project w/ 2 scripts
     let tempdir = ScratchDir::new();
     let mut runner = Runner::new(&tempdir);

@@ -320,23 +320,27 @@ impl WriteCompletionScript {
 
 <bright-green,bold>Activating tab completion in supported shells</>
 
-<bold,underline>Bash:</>
-
-To activate completions <bold>for the current session</>:
-  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
-
-To make these completions available <bold>automatically</>, add "<cyan>source <<({this_cmd} bash)</>" to your startup script (usually this will be one of <blue>~/.bashrc</>, <blue>~/.bash_profile</>, or <blue>~/.profile</>).
-
-<bold,underline>Fish:</>
-
+<bold>Fish:</>
 To activate completions <bold>for the current session</>:
   $ <bright-cyan,bold>{this_cmd} fish | source</>
 
 To make these completions available <bold>automatically</>:
  $ <bright-cyan,bold>{this_cmd} fish >> ~/.config/fish/completions/{invoked_cmd}.fish</>
 
-<bold,underline>Zsh:</>
 
+<bold>Bash:</>
+To activate completions <bold>for the current session</>:
+  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
+
+To make these completions available <bold>automatically</>, add "<cyan>source <<({this_cmd} bash)</>" to your startup script (e.g., <blue>~/.bashrc</>, <blue>~/.bash_profile</>, or <blue>~/.profile</>).
+
+Tips for Bash:
+ - cargo's builtin completions (usually generated via "<cyan>rustup completion bash cargo</>")
+   require the <blue>bash-completion</> package (usually from the system package manager)
+   and activated (usually something like "<cyan>[[ -r '/path/to/bash_completion" ]] && . /path/to/bash_completion</>' in your startup script).
+
+
+<bold>Zsh:</>
 To activate completions <bold>for the current session</>:
   $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
 

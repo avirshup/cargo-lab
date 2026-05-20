@@ -1,5 +1,8 @@
+use std::path::Path;
+
 use assert_cmd::Command;
 use camino::{Utf8Path, Utf8PathBuf};
+use color_print::ceprintln;
 use tempfile::tempdir;
 
 const BIN_NAME: &str = "cargo-playground";
@@ -12,13 +15,20 @@ impl ScratchDir {
     pub fn new() -> Self {
         Self(tempdir().expect("can create tempdir"))
     }
+
+    pub fn path(&self) -> &Path {
+        self.0.path()
+    }
 }
 
 /// For debugging, ensure the temp dir does NOT get cleaned up during a panic
 impl Drop for ScratchDir {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            eprintln!("Tempdir saved: {}", self.0.path().to_string_lossy());
+            ceprintln!(
+                "Tempdir saved: <bright-blue,underline>{}</>",
+                self.0.path().to_string_lossy()
+            );
             self.0.disable_cleanup(true);
         }
     }
@@ -34,7 +44,7 @@ pub struct Runner<'dir> {
 impl<'dir> Runner<'dir> {
     pub fn new(tempdir: &'dir ScratchDir) -> Self {
         Self {
-            working_dir: Utf8Path::from_path(tempdir.0.path())
+            working_dir: Utf8Path::from_path(tempdir.path())
                 .expect("temp dir is UTF-8")
                 .to_owned(),
             tempdir,
@@ -55,32 +65,34 @@ impl<'dir> Runner<'dir> {
         }
     }
 
-    /// run the cargo playground command with provided options
-    /// and the runner's currently configured env vars + working dir
+    /// run an arbitrary command
+    #[must_use]
+    pub fn run(&self, exe_cmd: &str, args: &[&str]) -> ProcResult {
+        self._runit(Command::new(exe_cmd), args)
+    }
+
+    /// build and run the cargo playground executable with the
+    /// given args
     #[must_use]
     pub fn run_cpg(&self, args: &[&str]) -> ProcResult {
-        let mut cmd = Command::cargo_bin(BIN_NAME).expect("found cargo exe");
+        self._runit(
+            Command::cargo_bin(BIN_NAME).expect("found cargo exe"),
+            args,
+        )
+    }
+
+    #[must_use]
+    pub fn run_cargo(&self, args: &[&str]) -> ProcResult {
+        self._runit(Command::new("cargo"), args)
+    }
+
+    fn _runit(&self, mut cmd: Command, args: &[&str]) -> ProcResult {
         let output = cmd
             .current_dir(&self.working_dir)
             .args(args)
             .envs(self.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
             .output()
             .expect("spawning cmd");
-
-        ProcResult {
-            output,
-            cmd_str: format!("{cmd:?}"),
-        }
-    }
-
-    #[must_use]
-    pub fn run_cargo(&self, args: &[&str]) -> ProcResult {
-        let mut cmd = Command::new("cargo");
-        let output = cmd
-            .current_dir(&self.working_dir)
-            .args(args)
-            .output()
-            .expect("spawning cargo cmd");
 
         ProcResult {
             output,
