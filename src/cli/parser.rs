@@ -293,19 +293,17 @@ impl WriteCompletionScript {
     fn add_after_help_examples(cmd: Command) -> Command {
         let invocation = InvocationType::from_env();
 
-        let invoked_cmd = invocation.invoked_cmd();
-
         // `get_bin_name()` is not the bin name, it
         // actually returns the bin name _with the subcommand already appended to it_
         // (e.g., "cargo-playground completions")
         let this_cmd =
             cmd.get_bin_name().unwrap_or("cargo-playground completions");
 
-        let bash_and_zsh_caveat = match &invocation {
+        let bash_and_zsh_cargo_subcmd_caveat = match &invocation {
             InvocationType::CargoSubcmd { .. } => cstr!(
-                r#"
-<yellow>warning:</> this may conflict with autocompletions already active for <cyan>cargo</>.
-(As a workaround, try calling the executable directly instead of through cargo)"#
+                r#"<yellow>NB:</> To avoid conflicts with completions for other cargo commands, activate <cyan>cargo</>'s completions <underline>first</>!
+(e.g., run <cyan>source <<(rustup completions cargo bash)</> before this one in your profile)
+"#
             ),
             InvocationType::Direct(_) => "",
         };
@@ -313,26 +311,34 @@ impl WriteCompletionScript {
         let helpstr = cformat!(
             r#"This command emits <italic>shell scripts</> that can be used to enable dynamic tab completion in various shells.
 
-To activate completions for your shell:
+<bright-green,bold>Shell autocompletion tips</>
+Please note that these steps should work for most common shell setups, but may require further customization to the emitted scripts; you may need to check your shell's documentation.
 
 <bold,underline>Fish:</>
 To activate completions for the current session:
 
   $ <bright-cyan,bold>{this_cmd} fish | source</>
 
-To lazily load these completions for every session, run
-
-  $ <bright-cyan,bold>{this_cmd} fish > ~/.config/fish/completions/{invoked_cmd}.fish</>
+Place this command in your <blue>~/.config/fish/config.fish</>
+to activate it for every session.
 
 <bold,underline>Bash/zsh:</>
+{bash_and_zsh_cargo_subcmd_caveat}
 To activate completions for the current session, either:
 
   $ <bright-cyan,bold>source <<({this_cmd} bash)</>
 or
   $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
-{bash_and_zsh_caveat}
 "#
         );
+
+        // // NOTE: in fish, lazy loading a script with `cargo playground completions fish | source`
+        // //    doesn't work, and in fact breaks autocomplete for cargo entirely
+        // //    (note - eval doesn't work either, nor does even just sourcing it from another file?).
+        // //    No idea why.
+        // let invoked_cmd = invocation.invoked_cmd();
+        //  r"#To lazily load these completions for every session, run
+        //  $ <bright-cyan,bold>{this_cmd} fish > ~/.config/fish/completions/{invoked_cmd}.fish"#</>
 
         cmd.after_help(helpstr)
     }

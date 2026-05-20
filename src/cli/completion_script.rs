@@ -4,6 +4,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use clap_complete::env::Shells;
 
 use super::InvocationType;
+use crate::cli::invocations::InvocationType::{CargoSubcmd, Direct};
 
 /// Print the completion script for the requested shell to stdout
 ///
@@ -23,7 +24,7 @@ pub fn print_completion_script(
     shell_name: &str,
     mut dest: impl io::Write,
 ) -> crate::Result<()> {
-    // ───── Part 1: gather all the different paramters we need ─────
+    // ───── Part 1: gather all the different parameters we need ─────
     let invocation = InvocationType::from_env();
 
     // path to this specific executable, which
@@ -35,10 +36,14 @@ pub fn print_completion_script(
     // this _might_ be cargo itself, or it might be this binary.
     let cmd = invocation.invoked_cmd();
 
-    // an identifier for the command (rn just the same as the command)
-    // (only used for namespacing in the generated shell script,
-    // does not affect anything else AFAICT)
-    let name = cmd;
+    // unique prefix for functions in the generated script
+    // to prevent collisions with other scripts
+    let name = match &invocation {
+        CargoSubcmd { cargo_subcmd, .. } => {
+            format!("{cmd}_pgsubcmd_{cargo_subcmd}")
+        },
+        Direct(_) => cmd.to_owned(),
+    };
 
     // ───── Part 2: build completer, add customizations, and print─────
     let builtins = Shells::builtins();
@@ -48,29 +53,45 @@ pub fn print_completion_script(
 
     // this is an IIFE so I can use the try operator
     || -> io::Result<()> {
-        // additions to autocomplete scripts to handle use as a cargo subcmd
-        if let InvocationType::CargoSubcmd { .. } = &invocation {
-            // TODO: bash / zsh ... if it's even possible
+        // have clap build the default completion script for us
+        let completion_script = {
+            let mut buffer: Vec<u8> = Vec::new();
+            completer.write_registration(
+                invocation.completion_env_var(),
+                &name,
+                cmd,
+                completion_generator_cmd,
+                &mut buffer,
+            )?;
+            String::from_utf8(buffer).expect("completion script is text")
+        };
 
-            // FOR FISH: special pre-script to ensure that the normal cargo
-            // completions get loaded too, if available.
-            // Why? Because when _lazy-loading_ autocompletions, fish stops
-            // looking after the first one it finds, so if it finds *our* "cargo.fish"
-            // then it won't also load the built-in `cargo.fish`.
-            if completer.name() == "fish" {
-                writeln!(dest, include_str!("autocomplete_helper.fish"))?;
-                writeln!(dest, "__load_lazy_completions \"{cmd}\"\n")?;
-            }
+        // potentially customize the completion script and write the result to stdout
+        match (completer.name(), &invocation) {
+            ("fish", CargoSubcmd { .. }) => _write_fish_cargosubcmd_script(
+                cmd,
+                &completion_script,
+                &mut dest,
+            ),
+
+            ("bash", CargoSubcmd { .. }) => _write_bash_autocomplete_script(
+                &name,
+                cmd,
+                &completion_script,
+                &mut dest,
+            ),
+
+            // TODO: a zsh
+
+            // all other
+            _everything_else => completer.write_registration(
+                invocation.completion_env_var(),
+                &name,
+                cmd,
+                completion_generator_cmd,
+                &mut dest,
+            ),
         }
-
-        // ───── Part 3: ask clap to please print out the script now ─────
-        completer.write_registration(
-            invocation.completion_env_var(),
-            name,
-            cmd,
-            completion_generator_cmd,
-            &mut dest,
-        )
     }()
     .map_err(|ioerr| {
         crate::ioerr!(
@@ -90,4 +111,46 @@ fn _cmd_or_canonical_path(path: &Utf8Path) -> Utf8PathBuf {
         1 => path.to_owned(),
         _2_or_more => path.canonicalize_utf8().expect("Path is valid utf-8"),
     }
+}
+
+// ───── Script customization ───────────────────────────────────── //
+
+/// For fish, add a call to ensure that cargo's autocompletion is also loaded
+fn _write_fish_cargosubcmd_script(
+    cmd: &str,
+    clap_completion_script: &str,
+    mut dest: impl io::Write,
+) -> io::Result<()> {
+    writeln!(
+        &mut dest,
+        "{}",
+        minijinja::render!(
+            include_str!("autocomplete_cargo_shim.fish"),
+            cmd,
+            clap_completion_script
+        )
+    )
+}
+
+/// for bash, we create a new autocomplete function that
+/// merges the results from cargo's autocomplete function (if it exists)
+/// and our own autocomplete function.
+/// Hacky as all hell unfortunately as we're using a regex to inject
+/// our extra function into clap's original script
+fn _write_bash_autocomplete_script(
+    name: &str,
+    cmd: &str,
+    clap_completion_script: &str,
+    mut dest: impl io::Write,
+) -> io::Result<()> {
+    writeln!(
+        &mut dest,
+        "{}",
+        minijinja::render!(
+            include_str!("autocomplete_cargo_shim.bash"),
+            cmd,
+            name,
+            clap_completion_script
+        )
+    )
 }
