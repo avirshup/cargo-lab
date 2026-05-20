@@ -92,7 +92,7 @@ pub fn new_script(
     // launch editor if requested
     if then_edit {
         super::launch_editor::edit_script(
-            &request.script,
+            Some(&request.script),
             &None,
             new_ctx.reload(),
         )?;

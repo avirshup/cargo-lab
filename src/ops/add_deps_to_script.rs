@@ -42,7 +42,7 @@ pub fn inject_deps(
     // launch editor if requested
     if then_edit {
         super::launch_editor::edit_script(
-            &orig_script.name,
+            Some(&orig_script.name),
             &None,
             new_ctx.reload(),
         )?;
