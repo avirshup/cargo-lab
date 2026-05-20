@@ -10,8 +10,11 @@ pub(super) const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_DIRECT";
 
 /// Was this invoked with an argv of `["cargo-$X", "$X", ..args]`
 /// or directly (with this exe as arg0?)
+/// This struct (and its methods) helps to smooth over all the differences
+/// between the two situations.
 ///
-/// Note that this does NOT detect usage as an xtask - xtasks
+/// ## Notes
+/// This does NOT detect usage as an xtask - xtasks
 /// are just aliases for `cargo run`, and `cargo run` will
 /// calls the executable directly (i.e., actually invoked executable
 /// will be something like "./target/debug/cargo-playground")
@@ -20,6 +23,7 @@ pub(super) enum InvocationType {
     CargoSubcmd {
         cargo_exe: Utf8PathBuf,
         cargo_subcmd: String,
+        this_exe: Utf8PathBuf,
     },
     Direct(Utf8PathBuf),
 }
@@ -42,28 +46,50 @@ impl InvocationType {
             && arg1 == cmd_suffix
         {
             InvocationType::CargoSubcmd {
-                cargo_exe: cargo_exe.into(),
+                cargo_exe: Utf8PathBuf::from(cargo_exe),
                 cargo_subcmd: arg1,
+                this_exe: exe_path.to_owned(),
             }
         } else {
             InvocationType::Direct(exe_path.to_owned())
         }
     }
 
-    pub(super) fn env_var_name(&self) -> &'static str {
+    // ───── Queries ────────────────────────────────────────────────── //
+    /// Returns this executable's path
+    pub(super) fn this_exe(&self) -> &Utf8Path {
+        match &self {
+            InvocationType::CargoSubcmd { this_exe, .. } => this_exe,
+            InvocationType::Direct(its_me) => its_me,
+        }
+    }
+
+    /// returns the exe that the user invoked (either this binary, or cargo itself)
+    pub(super) fn invoked_exe(&self) -> &Utf8Path {
+        match &self {
+            InvocationType::CargoSubcmd { cargo_exe, .. } => cargo_exe,
+            InvocationType::Direct(exe) => exe,
+        }
+    }
+
+    /// returns the _command_ that the user invoked
+    pub(super) fn invoked_cmd(&self) -> &str {
+        self.invoked_exe().file_name().expect("exe has a filename")
+    }
+
+    /// env var to use the autocomplete system
+    pub(super) fn completion_env_var(&self) -> &'static str {
         match self {
             InvocationType::CargoSubcmd { .. } => SUBCMD_COMPLETE_VAR,
             InvocationType::Direct(_) => DIRECT_COMPLETE_VAR,
         }
     }
 
+    // ───── Argument handling ──────────────────────────────────────── //
+    /// argv to in a form parsable by our [`cli::MainCli`] parser
     pub(super) fn normalized_argv(&self) -> Vec<String> {
         let mut args: Vec<String> = env::args().collect();
-        if let InvocationType::CargoSubcmd {
-            cargo_exe: _,
-            cargo_subcmd: _,
-        } = self
-        {
+        if let InvocationType::CargoSubcmd { .. } = self {
             args.remove(1);
         }
         args
@@ -71,7 +97,7 @@ impl InvocationType {
 
     /// Build a runtime CLI parser. Note that this MUST
     /// be used with `parse_from(normalized_argv)` (TODO: perhaps
-    /// this can just be exposed as `Invocatin::parse_args`)?
+    /// this can just be exposed as `Invocation::parse_args`)?
     ///
     /// Note this CANNOT BE USED in autocomplete mode.
     pub(super) fn build_cli_cmd(&self) -> clap::Command {
@@ -80,6 +106,7 @@ impl InvocationType {
         if let InvocationType::CargoSubcmd {
             cargo_exe,
             cargo_subcmd,
+            ..
         } = self
         {
             let name = format!(
