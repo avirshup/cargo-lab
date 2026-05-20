@@ -2,6 +2,8 @@
 name = "cargo-playground"
 version = "0.0.0-unset"
 edition = "2024"
+include = ["src/", "tests/", "templates/", "./README.md", "./NOTICES.md", "./LICENSE", "deny.toml"]
+license = "MIT"
 
 [[bin]]
 name = "cargo-playground"

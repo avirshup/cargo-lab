@@ -1,0 +1,120 @@
+# Docs: https://embarkstudios.github.io/cargo-deny/checks/cfg.html
+
+
+# ───── Global config ──────────────────────────────────────────── #
+[graph]
+## If 1 or more target triples (and optionally, target_features) are specified,
+## only the specified targets will be checked when running `cargo deny check`.
+# targets = []
+
+## Crates to exclude
+#exclude = []
+
+# pass `--all-features` on the cmd line to enable
+all-features = false
+no-default-features = false
+features = []
+
+[output]
+feature-depth = 1
+
+# ───── For `cargo deny check advisories` ──────────────────────── #
+[advisories]
+#db-path = "$CARGO_HOME/advisory-dbs"
+#db-urls = ["https://github.com/rustsec/advisory-db"]
+#ignore = []
+#git-fetch-with-cli = true
+
+
+# ───── For `cargo deny check licenses` ────────────────────────── #
+[licenses]
+# List of explicitly allowed licenses (by SPDX 3.11 short identifier)
+# See https://spdx.org/licenses/
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0"
+]
+# for matching license text
+confidence-threshold = 0.9
+
+## per-crate license exceptions
+#exceptions = [
+#    #{ allow = ["Zlib"], crate = "adler32" },
+#]
+
+## Explicitly license clarification (array of tables)
+#[[licenses.clarify]]
+## The package spec the clarification applies to
+## SPDX expression describing this crate's license
+#crate = "ring"
+#expression = "MIT AND ISC AND OpenSSL"
+## One or more files in the crate's as license "source of truth"
+#license-files = [
+## Each entry is a crate relative path, and the (opaque) hash of its contents
+#{ path = "LICENSE", hash = 0xbd0eed23 }
+#]
+
+[licenses.private]
+## Registries considered "private"
+#registries = [ "https://sekretz.com/registry" ]
+
+# ignore licenses for workspace / private registry crates?
+ignore = false
+
+
+# ───── For `cargo deny check bans` ────────────────────────────── #
+[bans]
+
+# Lint levels
+multiple-versions = "warn" # multiple versions of same crate
+wildcards = "warn" # crate version requirement is `*`
+highlight = "all" # graph highlighting: lowest-version, simplest-path, or all
+workspace-default-features = "allow"  # workspace crates use default features
+external-default-features = "allow"  # dependencies use default features
+
+## Explicit allowlist (overrides bans)
+#allow = [
+#    #"ansi_term@0.11.0",
+#    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is allowed" },
+#]
+
+# Automatically add workspace crates to the allowlist?
+allow-workspace = false
+
+# crates (and/or specific versions thereof) that are explicitly banned
+deny = []
+
+# Certain crates/versions that will be skipped when doing duplicate detection.
+skip = [
+    #"ansi_term@0.11.0",
+    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason why it can't be updated/removed" },
+]
+# Like skip except it also includes the listed dep's transitive deps
+skip-tree = [
+    #"ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
+    #{ crate = "ansi_term@0.11.0", depth = 20 },
+]
+
+## Features that are explicitly allowed/banned for a crate (array-of-tables)
+## UMMM: This is not documented?
+##    And the `deny init` template created it in the middle of another table?
+#[[bans.features]]
+#crate = "reqwest"
+#deny = ["json"]
+#allow = ["rustls"]
+## If true, the allowed features must exactly match the enabled feature set. If
+## this is set there is no point setting `deny`
+#exact = true
+
+
+# ───── For `cargo deny check sources` ─────────────────────────── #
+[sources]
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index"  # i.e., public crates.io
+]
+allow-git = []
+
+# lint levels
+unknown-registry = "deny"
+unknown-git = "deny"
