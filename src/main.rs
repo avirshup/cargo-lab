@@ -1,6 +1,4 @@
 #[macro_use]
-extern crate macro_rules_attribute;
-
 mod cli;
 mod data;
 mod errors;

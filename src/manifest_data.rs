@@ -16,12 +16,8 @@ use serde::Deserialize;
 
 use crate::{data, util};
 
-attribute_alias! {
-   #[apply(TomlTable!)] = #[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)];
-}
-
 /// Deserialized relevant data from Cargo.toml
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ManifestData {
     pub package: Option<PackageTable>,
@@ -104,7 +100,7 @@ impl ManifestData {
 }
 
 /// The top-level `[package]` table
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct PackageTable {
     pub name: Option<String>,
@@ -112,7 +108,7 @@ pub struct PackageTable {
 }
 
 /// An entry in the `[[bin]]` array-of-tables
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct BinTable {
     pub name: Option<String>,
@@ -134,7 +130,7 @@ pub enum DepEntry {
     Table(DependencyTable),
 }
 
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct DependencyTable {
     pub version: Option<String>,
@@ -176,13 +172,13 @@ impl FromStr for DependencyTable {
     }
 }
 
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct PackageMetadata {
     pub cargo_playground: Option<PlaygroundConfig>,
 }
 
-#[apply(TomlTable!)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct PlaygroundConfig {
     #[serde(default = "_false")]

@@ -14,10 +14,6 @@ use crate::cli::invocations::InvocationType;
 use crate::vendor_cargo::style;
 use crate::{build_passthrough_long_args, data};
 
-attribute_alias! {
-   #[apply(DeriveArg)] = #[derive(Clone, Debug)];
-}
-
 pub(super) const STYLES: Styles = Styles::styled()
     .header(style::HEADER)
     .usage(style::USAGE)
@@ -28,8 +24,7 @@ pub(super) const STYLES: Styles = Styles::styled()
     .invalid(style::INVALID);
 
 /// Manage script playgrounds as cargo projects
-#[apply(DeriveArg)]
-#[derive(Parser)]
+#[derive(Clone, Debug, Parser)]
 #[command(version, about, long_about = None, styles = STYLES)]
 pub struct MainCli {
     #[command(subcommand)]
@@ -39,8 +34,7 @@ pub struct MainCli {
     pub global_args: GlobalArgs,
 }
 
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct GlobalArgs {
     /// Path to the playground's manifest directory
     #[arg(
@@ -67,8 +61,7 @@ pub struct GlobalArgs {
 }
 
 // ───── Top-level subcmd enum ──────────────────────────────────── //
-#[apply(DeriveArg)]
-#[derive(Subcommand)]
+#[derive(Clone, Debug, Subcommand)]
 pub enum SubCmd {
     /// Create a new playground
     #[command(name = "init")]
@@ -122,8 +115,7 @@ pub enum SubCmd {
 // ───── Subcommands                                                 ───── //
 // ──────────────────────────────────────────────────────────────────────── //
 /// Create a new playground
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct InitPlayground {
     /// Path to initialize a as playground.
     ///
@@ -166,8 +158,7 @@ pub struct RunScript {
 }
 
 /// Create a new playground script
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct NewScript {
     /// Name of the script to create (optional).
     /// If not provided, a random human-readable name will be generated
@@ -179,8 +170,7 @@ pub struct NewScript {
 }
 
 /// All the arguments for new scripts except its name.
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct NewScriptOpts {
     #[arg(short, long, add = template_name_completer())]
     pub template: Option<String>,
@@ -199,8 +189,7 @@ pub struct NewScriptOpts {
 }
 
 /// Create a new playground script
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct RenameScript {
     /// Name of the script to be renamed
     #[arg(value_name = "SCRIPT", add = script_name_completer())]
@@ -222,8 +211,7 @@ pub struct RenameScript {
 //   `#[cfg(feature)]` attributes (or not, those are very noisy-looking)
 
 /// Add dependencies and/or activate features for a script
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct InjectDeps {
     /// name of the script to add dependencies to
     #[arg(add = script_name_completer(), value_name = "SCRIPT")]
@@ -240,16 +228,14 @@ pub struct InjectDeps {
 }
 
 /// Print information about script
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct ShowScriptInfo {
     #[arg(add = script_name_completer())]
     pub script_name: String,
 }
 
 /// Open script in editor
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct EditScript {
     /// name of the script to edit (if not present, opens the playground's root dir)
     #[arg(add = script_name_completer(), value_name = "SCRIPT")]
@@ -270,8 +256,7 @@ pub struct EditScript {
 }
 
 /// Print CLI completion commands to stdout.
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct WriteCompletionScript {
     // TODO: list supported shells (
     // see `clap_complete::env::Shells::builtins()`)
@@ -367,8 +352,7 @@ Please note that:
     }
 }
 
-#[apply(DeriveArg)]
-#[derive(Args)]
+#[derive(Clone, Debug, Args)]
 pub struct InjectArgs {
     #[arg(
         help = "Dependencies, with optional versions",
@@ -403,12 +387,11 @@ The [DEPNAME/] prefix may be omitted if exactly one dependency has been specifie
 }
 
 // MAYBE: this should just be a regular struct definition w/ a derive macro
-//   (use `macro_rules_attribute` and/or `derive_deftly`)?
 //   Although ... using a DSL is tbh way way easier
 //   because it doesn't have to support everything?
 // TODO: when you `--help`, each one of these arguments takes up 3 lines even though
 //       it has no help. Overriding the command's help template won't help because
-//       it doesn't control arg formatting.
+//       it doesn't control arg formatting ...
 build_passthrough_long_args!(
     /// Specific args to be forwarded to cargo add
     ///
