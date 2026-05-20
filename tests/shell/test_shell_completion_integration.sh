@@ -1,8 +1,29 @@
 #!/usr/bin/env bash
-
+# Directly test if autocompletion is set up correctly in various shells.
+# Somewhat wonky. Currently DOES NOT TEST ZSH and BASH TESTS ARE HACKY.
+# (Can also be tested manually by building the autocomplete environment
+# container with `earth +autocomplete-env` then interactively running
+# it)
+#
+# (I tried doing this "the right way" - testing autocomplete _in a PTY_ -
+# using `completest-pty` but for reasons unknown could not get
+# it to work in the CI container environment ...)
+#
+# WONKINESS WARNING: Testing tab-completion outside of a PTY
+# isn't totally possible in bash or zsh (it works great in fish though!).
+# Specifically:
+# - for ZSH: zsh has multiple autocomplete systems with a lot of complexity.
+#   There is no equivalent to `complete --do-complete`.
+#   Without a PTY, there is no sane path to testing here.
+#
+# - for BASH: the script that clap's `CompleteEnv` emits uses `compopt`,
+#   which is not working correctly as called here - it spits out a bunch
+#   of warnings that I think indicate it needs to be running in a PTY,
+#   (including "not currently executing completion function" and
+#   "no job control in this shell")
 set -eou pipefail
 
-# really basic tests to ensure autcomplete is still working
+# really basic tests to ensure autocomplete is still working
 # for both cargo _and_ -playground
 function test_autocomplete_works() {
   assert_completion "cargo met" "metadata"
@@ -14,11 +35,8 @@ function test_autocomplete_works() {
     assert_completion "$cmd inj" "inject"
 
     # # ensure not returning wrong completions
+    # # !DISABLED! for now, see bash wonkiness warning at top
     # assert_not_completion "$cmd ne" "inject"
-    # # NOTE: disabled for now, this test fails for bash
-    # # because (I think) the script that clap generates
-    # # calls the bash built-in "compopt", which doesn't
-    # # like our mocked completion environment
 
     # ensure not (somehow) returning cargo's completions
     assert_not_completion "$cmd met" "metadata"

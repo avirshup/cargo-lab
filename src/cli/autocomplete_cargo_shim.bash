@@ -7,7 +7,7 @@
 # - If there is no function registered, prints nothing and returns 0
 # - If there is an error, prints nothing and returns 1
 # - Otherwise prints the name of the function and returns 0
-_registered_completion_fn() {
+_bash_registered_completion_fn() {
   local cmd="$1"
 
   # output is of form "complete [...] -F $function $cmd"
@@ -22,7 +22,7 @@ _registered_completion_fn() {
 }
 
 # ───── The actual completion function ─────────────────────────────────── #
-_CARGO_PG_PARENT_COMPLETER=$(_registered_completion_fn "{{cmd}}")
+_CARGO_PG_PARENT_COMPLETER=$(_bash_registered_completion_fn "{{cmd}}")
 
 _complete_cargo_pg_combined() {
   local all_completions=()
@@ -35,10 +35,12 @@ _complete_cargo_pg_combined() {
   COMPREPLY+=("${all_completions[@]}")
 }
 
-# ───── Registration ───────────────────────────────────────────── #
-# clap complete script
+# START: script emitted from clap::CompleteEnv
 {{clap_completion_script}}
+# END: script emitted from clap::CompleteEnv
 
+
+# ───── Registration ───────────────────────────────────────────── #
 if test -n "$_CARGO_PG_PARENT_COMPLETER"; then
     # overwrite the completion registration (again) with our function
     if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then

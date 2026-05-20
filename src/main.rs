@@ -101,7 +101,6 @@ fn run(args: cli::MainCli) -> Result<()> {
             edit,
         }) => {
             // automatically generate the name
-            // TODO: base it on the dependencies if any are requested
             let manifest_data = ctx.manifest_data()?;
             let script_name =
                 _generate_script_name_from_deps(&inject_args.deps, |name| {

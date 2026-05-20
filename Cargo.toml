@@ -1,9 +1,13 @@
 [package]
 name = "cargo-lab"
-version = "0.0.0-unset"
+version = "0.0.0-unset"  # do not change manually, will be assigned in CI
 edition = "2024"
 include = ["src/", "tests/", "templates/", "./README.md", "./NOTICES.md", "./LICENSE", "deny.toml"]
 license = "MIT"
+homepage = "https://github.com/avirshup/cargo-playground"
+description = "A cargo plugin for managing a project full of one-off scripts."
+categories = ["development-tools::cargo-plugins", "command-line-utilities"]
+keywords = ["cargo", "playground", "script", "cargo-subcommand", "cli"]
 
 [[bin]]
 name = "cargo-playground"
@@ -11,7 +15,7 @@ path = "src/main.rs"
 
 [features]
 xtask = []  # for use as an "xtask" in a subfolder of the project root
-experimental_cargo_script_rfc3502 = ["dep:winnow"]
+experimental_cargo_script_rfc3502 = ["dep:winnow"]  # does NOT currently work!
 
 # (most?) aggressive size optimizations
 # In linux/mac tests, this reduces size by 50% from normal release
@@ -42,7 +46,7 @@ rand = "0.10.1"
 toml_edit = { version = "0.25.11", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
-winnow = { version = "1.0.1", optional = true }
+winnow = { version = "1.0.1", optional = true }  # only used w/ rfc3502 feature flag
 
 # Trust: very high (audit by mozilla, owned by core devs)
 camino = "1.2.2"
@@ -52,8 +56,6 @@ similar = { version = "3.1.0", features = ["inline"] } # provides diffs
 
 # Trust: very high (by @mitsuhiko, only dep is serde)
 minijinja = "2.20.0"
-
-
 
 # ───── TEST DEPS ──────────────────────────────────────────────── #
 [dev-dependencies]

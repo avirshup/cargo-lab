@@ -7,9 +7,11 @@ FROM rust:1.96.0-slim
 IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
 
 all:
-    BUILD +check
-    BUILD +test
-    BUILD +test-e2e
+    WAIT
+        BUILD +tests
+    END
+    BUILD +crate
+    BUILD +exe
 
 
 # ──────────────────────────────────────────────────────────────────────── #
@@ -132,6 +134,9 @@ shell-testing-env:
     RUN mkdir -p ~/.config/fish/completions
 
 autocomplete-env:
+    # An image with cargo playground installed AND autocomplete configured
+    # fish, bash, and zsh. Outputs an image directly for manual testing
+    # when invoked directly as a build target.
     FROM +shell-testing-env
 
     COPY +exe/cargo-playground $CARGO_HOME/bin
@@ -149,6 +154,8 @@ autocomplete-env:
     RUN cargo playground completions zsh >> .zshrc
     RUN cargo playground completions fish > .config/fish/completions/cargo.fish
 
+    SAVE IMAGE cpg_autocomplete:$(cargo playground --version | awk '{print $2}')
+
 
 # ──────────────────────────────────────────────────────────────────────── #
 # ───── Tests and checks                                             ───── #
@@ -161,7 +168,7 @@ tests:
         BUILD +test-unit
     END
     BUILD +test-e2e
-    BUILD +test-autocomplete
+    BUILD +test-shell-autocomplete
 
 lints:
     FROM +src
@@ -193,7 +200,10 @@ test-e2e:
     FROM +src
     DO rust+CARGO --args="test -- --ignored"
 
-test-autocomplete:
+test-shell-autocomplete:
+    # Invokes configured shells to test autocomplete using a script
+    # Currently this emits a lot of warnings but still basically
+    # works, see "test_shell_completion_integration.sh"
     FROM +autocomplete-env
     COPY tests/shell/test_shell_completion_integration.sh ./
     RUN bash test_shell_completion_integration.sh
@@ -221,10 +231,10 @@ exe:
 
 
 publish:
+    ARG build_tag
     FROM +build-env
     DO +SETUP_CRATE_TREE
-    ARG build_tag=""
-    ARG live="--dry-run"
+    ARG live="--dry-run"  # dry run by default, pass `--live=""` to do it live
 
     # ensure we have the version we want
     RUN echo "Computed version: $CRATE_VERSION"
@@ -240,16 +250,17 @@ publish:
         exit 1
     END
 
-    WAIT
-        BUILD +check
-        BUILD +test
-    END
+    BUILD +all  # entire pipeline must be successful before the push!
     RUN --push \
         --secret CARGO_REGISTRY_TOKEN=apitoken \
         cargo publish $live --allow-dirty
 
 
 # ───── Helpers and utils ──────────────────────────────────────── #
+# `cargo install` builds are not cached by cargo, so every time
+# the layer gets invalidated they will get entirely recompiled.
+# So build them here in separate layers and copy the artifacts
+# when needed
 build-cargo-set-version:
     FROM +build-env
     DO rust+CARGO --args="install --locked cargo-edit"

@@ -36,7 +36,12 @@ pub struct MainCli {
 
 #[derive(Clone, Debug, Args)]
 pub struct GlobalArgs {
-    /// Path to the playground's manifest directory
+    /// Path to directory w/ Cargo.toml
+    ///
+    /// If not passed, this defaults to
+    /// the env var "CARGO_PLAYGROUND_MANIFEST_DIR" if it is set,
+    /// otherwise discovered by searching the current working
+    /// directory and its parents for "Cargo.toml"
     #[arg(
         long,
         global = true,
@@ -67,23 +72,23 @@ pub enum SubCmd {
     #[command(name = "init")]
     InitPlayground(InitPlayground),
 
-    /// Run a script
+    /// Run a playground script
     #[command(name = "run")]
     RunScript(RunScript),
+
+    /// Create a new script (with a random name)
+    #[command(name = "quick")]
+    QuickScript(NewScriptOpts),
 
     /// Create a new script
     #[command(name = "new")]
     NewScript(NewScript),
 
-    /// Create a new script with an automatically generated name
-    #[command(name = "quick")]
-    QuickScript(NewScriptOpts),
-
-    /// Rename script
+    /// Rename a script
     #[command(name = "rename")]
     RenameScript(RenameScript),
 
-    /// List the scripts declared in `Cargo.toml`
+    /// List all scripts in playground
     #[command(name = "list")]
     ListScripts,
 
@@ -95,7 +100,7 @@ pub enum SubCmd {
     #[command(name = "inject")]
     InjectDeps(InjectDeps),
 
-    /// Open a script in your editor
+    /// Open editor / IDE
     #[command(name = "edit")]
     EditScript(EditScript),
 
@@ -364,7 +369,7 @@ missing dependencies will be installed with `cargo add`",
     )]
     pub deps: Vec<data::DepRequest>,
 
-    // TODO: could this be flattened using Arg::value_delimeter?
+    // TODO: could this be flattened using Arg::value_delimiter?
     //   Is there a way to have more than one delimiter? (i.e.,
     //   here, commas OR any whitespace?)
     #[arg(

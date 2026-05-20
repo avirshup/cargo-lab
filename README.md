@@ -1,8 +1,36 @@
 # `cargo-playground`
 
-A tool for quick, disposable, local, and IDE-friendly "playground" scripts.
+[![Crates.io](https://img.shields.io/crates/v/cargo-playground?style=flat-square)](https://crates.io/crates/clap)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-### What is this for?
+A cargo plugin for quick, disposable, local, and IDE-friendly Rust "playground" scripts with arbitrary dependencies.
+
+It currently supports all of rust's "unix" systems (e.g., macos and linux).
+
+## Contents
+
+<!-- TOC -->
+
+* [`cargo-playground`](#cargo-playground)
+    * [Contents](#contents)
+    * [What is this for?](#what-is-this-for)
+        * [WARNING: This is not a sandbox.](#warning-this-is-not-a-sandbox)
+    * [Quick start](#quick-start)
+    * [The basic idea](#the-basic-idea)
+        * [Workflows](#workflows)
+            * [Setup](#setup)
+            * [Creating scripts](#creating-scripts)
+            * [Working with scripts](#working-with-scripts)
+        * [Example](#example)
+    * [Configuration](#configuration)
+        * [In `Cargo.toml`](#in-cargotoml)
+    * [Why?](#why)
+        * [Alternatives](#alternatives)
+    * [Provenance](#provenance)
+
+<!-- TOC -->
+
+## What is this for?
 
 You can navigate [https://play.rust-lang.org/](https://play.rust-lang.org/) and,
 in about 10 seconds, try out some rust code or even play around with a some (curated)
@@ -12,18 +40,15 @@ crates. `cargo playground`'s goal is to make it as fast and easy to do this:
 2. with _your_ IDE's normal features, and
 3. with any set of dependencies<a href="#hygiene"><sup>†</sup></a> and features that you care to try.
 
-### WARNING: This is not a sandbox!
+### <a id="hygiene"><sup>†</sup></a>WARNING: This is not a sandbox.
 
-<a name="hygiene"></a>
+Don't run untrusted code or dependencies without protection. <!-- TODO: add more plausibly deniable euphemisms -->
 
-#### Don't run untrusted code or dependencies.
-
-A `cargo playground`-managed "playground" is
-_a standard, local cargo
-project_ that should compose cleanly with standard rust dev tooling.
-Using `cargo playground run` is no different than running
-`cargo run --bin $bin_name` - it builds your program _and all of its
-dependencies_ and then executes it.
+A `cargo playground`-managed "playground" is local cargo project; the same security
+that apply to any cargo project apply here. Running
+`cargo playground run $script` will execute
+`cargo run --bin $script --features "[...]` - it builds your program _and all of
+its dependencies_ and then executes it.
 
 Running a malicious playground script
 or even just *building* a malicious dependency
@@ -32,7 +57,8 @@ is [exactly](https://github.com/rust-lang/cargo/security/advisories/GHSA-rfj2-q3
 ## Quick start
 
 This program is designed to run as a cargo subcommand, and can be installed via
-`cargo install cargo-playground`.
+`cargo install cargo-playground`. (To setup tab-completion
+in your shell, run `cargo playground completions --help`).
 
 You can then set up a new "playground" project:
 
@@ -66,16 +92,15 @@ success: Created minimal script at: src/my_first_script.rs
 success: Playground initialized in directory 'my-new-playground'
 
 Tips:
- 1) To enable autocomplete, see `cargo playground completions --help`
+ 1) To enable tab-completion, see `cargo playground completions --help`
  2) To access this playground from any working directory, set
     `CARGO_PLAYGROUND_MANIFEST_DIR=/path/to/my-new-playground`
     or use the `--manifest-path` flag
     (`cargo playground --manifest-path=/path/to/my-new-playground`).
- 3) You can alias the command to something shorter, either by
-    - cargo config: in `~/.cargo/config.toml`:
-        [aliases]
-        pg = "playground"
-    - or, via your shell (e.g., `alias cpg="cargo playground"`).
+ 3) To alias the command to something shorter, use a shell alias
+    (e.g., `alias cpg="cargo playground"`);
+    tab-completion won't (for now) work with cargo aliases in config.toml.
+
 ```
 
 This will create a completely normal cargo project that the IDE of your
@@ -90,7 +115,9 @@ $ tree .
 │   └── new_playground.rs
 └── templates
     ├── bare.rs.template
-    └── clap.rs.template
+    ├── basic.rs.template
+    ├── clap.rs.template
+    └── clap_subcmd.rs.template
 ```
 
 Each script managed by `cargo-playground` will have an entry like this
@@ -104,24 +131,31 @@ required-features = ["dep1", "dep2", "dep3/feature"]
 ```
 
 Note that you can (and should) edit the generated Cargo.toml if you want,
-including the scripts themselves - this tool gets all the information it needs
-by parsing Cargo.toml.
+and cargo playground should continue to work normally. If you're having
+problems, try running `cargo check` and
+`cargo playground check` to detect config issues.
 
-### Workflows
+## Useful commands
 
-#### Setup
+### Installation and setup
 
-- `cargo playground init` - creates a new project
-- `cargo playground completions` - set up tab-completion for various shells
+-
 
-#### Creating scripts
+`cargo install --locked cargo-playground` will build and install the latest stable version
+from crates.io and make the `cargo playground` subcommand available.
+
+### Creating playgrounds projects
+
+- `cargo playground init` - creates a new playground project
+
+### Creating scripts in playgrounds
 
 - `cargo playground quick [deps] [-F features]`:
   create new script with autogenerated name
 - `cargo playground new (SCRIPT) [deps] [-F features]`:
   create new script with a chosen name
 
-#### Working with scripts
+### Working with scripts
 
 - `cargo playground run (SCRIPT) [args ...]`:
   run a script (unlike `cargo run --bin`, this automatically activates all
@@ -189,6 +223,18 @@ my experiment's output goes here
 
 ## Configuration
 
+### Shell autucomplete
+
+Instructions for setting up tab completions for various shells can displayed by running
+`cargo playground completions --help`. Fish, Bash, and ZSH are all supported;
+other shells supported by `clap` *may* work but have not been tested.
+
+If you experience issues with tab completions, they may be due to conflicts
+with other cargo plugins or even cargo itself. One workaround is to call the executable directly
+(spelled "`cargo-playground`" with a hyphen, one word)
+instead of through cargo
+("`cargo playground`" with a space in the middle, two words).
+
 ### In `Cargo.toml`
 
 `cargo playground` stores configuration playground's `Cargo.toml` in the
@@ -232,12 +278,13 @@ editor-cmd = ["rustrover"]
   support.
 - [
   `evcxr`](https://github.com/evcxr/evcxr) is an insanely impressive REPL for rust (which
-  _should not be even possible_).
+  _should not be even possible_)
 - A normal crate with lots of
-  `[[bin]]` also works ok - this project in fact started its life as an
-  `xtask` in my own personal playground crate. It was getting to be a pain to manage, especially with all of the various dependencies, so I built this tool to automate it.
+  `[[bin]]` entries also works ok - this project used to be my personal
+  playground repository, which then evolved an `xtask` to help
+  manage the dependencies, which then turned into this standalone tool.
 
-### Provenance
+## Provenance
 
 - **License**:
   This project is provided under the [MIT License](./LICENSE).
@@ -245,9 +292,13 @@ editor-cmd = ["rustrover"]
   The source code in the `src/vendor_cargo` directory is vendored from the cargo
   project and used under the MIT license.
 - **Copyrightability**: all first-party material in this repository
-  was written soley by (and for)
+  was written solely by (and for)
   its human authors. It does not contain, nor was it derived from,
   LLM or other generative "AI" output.
+
+This software provides a plugin for the
+**`cargo`** command-line tool. It is not a product of or otherwise affiliated with
+the [Cargo project](https://doc.rust-lang.org/stable/cargo/).
 
 <!--
 ### AI agent instructions
