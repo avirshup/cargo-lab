@@ -9,7 +9,7 @@ use clap::{CommandFactory, FromArgMatches};
 use crate::cli;
 
 pub fn autocomplete_or_parse_args() -> cli::MainCli {
-    // ───── Let clap decide whether or not we're generating completions ─────
+    // ───── Potentially do autocomplete stuff then exit ─────
     // this is essentially the same as `CompleteEnv::complete()` except
     // we're dispatching based on the specific autocomplete env var that's
     // been passed.
@@ -47,9 +47,10 @@ fn _run_normal_autocomplete_and_exit() {
 /// Called when we think we're generating autocompletions for
 /// an invocation of cargo itself. This needs to figure out 2 things:
 /// 1) Is the user even trying to run `cargo playground`?
-///    If not, we need to output nothing and exit as quickly as possible.
+///    (If not, then it's some other cargo command so
+///    we need to output nothing and exit as quickly as possible.)
 /// 2) If so, we need to figure out how "playground" is spelled here (i.e.,
-///    work the same even if the user renamed an executable or whatever)
+///    make it work even if the user renamed the executable or whatever)
 fn _run_cargo_subcmd_autocomplete_and_exit() {
     let mut arg_iter = env::args();
 

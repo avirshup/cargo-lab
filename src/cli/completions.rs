@@ -18,7 +18,9 @@ use crate::global_ctx::{GlobalCtx, Verbosity};
 // and shouldn't emit any STDOUT (anything written to stdout becomes
 // an autocomplete option), and STDERR only in pathological siutations (as autocomplete
 // should generally not have user-visible side effects)
-// TODO: set up proper logging so this can be debugged when it all goes wrong
+// TODO: figure out the recommended approach to logging / debugging in autocomplete
+//   scripts so this can be debugged when it all goes terribly wrong
+//   (caveat: likely no such approach exists)
 
 pub fn manifest_path_completer() -> ArgValueCompleter {
     ArgValueCompleter::new(PathCompleter::any().filter(|path: &Path| {
@@ -29,48 +31,22 @@ pub fn manifest_path_completer() -> ArgValueCompleter {
 pub fn script_name_completer() -> ArgValueCandidates {
     ArgValueCandidates::new(|| {
         let ctx = _completion_ctx();
-        if let Ok(manifest) = ctx.manifest_data() {
-            manifest
-                .iter_script_entries()
-                .map(|script| {
-                    CompletionCandidate::new(script.name)
-                        .help(Some(script.path.to_string().into()))
-                    // TODO: add .display_order() based on most recenty used?
-                    //     Or based on creation order (would be reverse of order
-                    //    from cargo.toml if it hasn't been modified)?
-                })
-                .collect()
-        } else {
-            vec![]
-        }
+        let Ok(manifest) = ctx.manifest_data() else {
+            return Vec::new();
+        };
+
+        let num_scripts = manifest.bin.len();
+        manifest
+            .iter_script_entries()
+            .enumerate()
+            .map(|(idx, script)| {
+                CompletionCandidate::new(script.name)
+                    .help(Some(script.path.to_string().into()))
+                    .display_order(Some(num_scripts - idx))
+            })
+            .collect()
     })
 }
-//
-// pub fn script_name_as_first_element_completer() -> ArgValueCompleter {
-//     ArgValueCompleter::new(FirstElementCompleter(script_name_completer()))
-// }
-//
-// struct FirstElementCompleter(ArgValueCandidates);
-//
-// impl ValueCompleter for FirstElementCompleter {
-//     /// only completes if index is 0
-//     fn complete(&self, _current: &OsStr) -> Vec<CompletionCandidate> {
-//         Vec::new()
-//     }
-//
-//     fn complete_at(
-//         &self,
-//         arg_index: usize,
-//         _current: &OsStr,
-//     ) -> Vec<CompletionCandidate> {
-//         eprintln!("completing! `{arg_index}`");
-//         if arg_index == 0 {
-//             self.0.candidates()
-//         } else {
-//             Vec::new()
-//         }
-//     }
-// }
 
 pub fn template_name_completer() -> ArgValueCandidates {
     ArgValueCandidates::new(|| {

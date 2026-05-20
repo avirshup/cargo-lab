@@ -30,7 +30,7 @@ use crate::errors::{Error, Result};
 use crate::global_ctx::GlobalCtx;
 
 fn main() -> ExitCode {
-    // under many circumstances this call will never return!
+    // under several circumstances this call will never return!
     // e.g., if autcomplete mode was requested, or `--help` was
     // passed, or args weren't parseable, etc etc.
     let args = cli::autocomplete_or_parse_args();
