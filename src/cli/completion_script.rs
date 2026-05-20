@@ -68,29 +68,40 @@ pub fn print_completion_script(
 
         // potentially customize the completion script and write the result to stdout
         match (completer.name(), &invocation) {
-            ("fish", CargoSubcmd { .. }) => _write_fish_cargosubcmd_script(
-                cmd,
-                &completion_script,
+            ("fish", CargoSubcmd { .. }) => writeln!(
                 &mut dest,
+                "{}",
+                minijinja::render!(
+                    include_str!("autocomplete_cargo_shim.fish"),
+                    cmd,
+                    clap_completion_script => &completion_script,
+                )
             ),
 
-            ("bash", CargoSubcmd { .. }) => _write_bash_autocomplete_script(
-                &name,
-                cmd,
-                &completion_script,
+            ("bash", CargoSubcmd { .. }) => writeln!(
                 &mut dest,
+                "{}",
+                minijinja::render!(
+                    include_str!("autocomplete_cargo_shim.bash"),
+                    cmd,
+                    name,
+                    clap_completion_script => &completion_script,
+                )
             ),
 
-            // TODO: a zsh
-
-            // all other
-            _everything_else => completer.write_registration(
-                invocation.completion_env_var(),
-                &name,
-                cmd,
-                completion_generator_cmd,
+            ("zsh", CargoSubcmd { .. }) => writeln!(
                 &mut dest,
+                "{}",
+                minijinja::render!(
+                    include_str!("autocomplete_cargo_shim.zsh"),
+                    cmd,
+                    name,
+                    clap_completion_script => &completion_script,
+                )
             ),
+
+            // ───── All other cases: use clap's default builtin script ─────
+            _everything_else => writeln!(&mut dest, "{completion_script}"),
         }
     }()
     .map_err(|ioerr| {
@@ -111,46 +122,4 @@ fn _cmd_or_canonical_path(path: &Utf8Path) -> Utf8PathBuf {
         1 => path.to_owned(),
         _2_or_more => path.canonicalize_utf8().expect("Path is valid utf-8"),
     }
-}
-
-// ───── Script customization ───────────────────────────────────── //
-
-/// For fish, add a call to ensure that cargo's autocompletion is also loaded
-fn _write_fish_cargosubcmd_script(
-    cmd: &str,
-    clap_completion_script: &str,
-    mut dest: impl io::Write,
-) -> io::Result<()> {
-    writeln!(
-        &mut dest,
-        "{}",
-        minijinja::render!(
-            include_str!("autocomplete_cargo_shim.fish"),
-            cmd,
-            clap_completion_script
-        )
-    )
-}
-
-/// for bash, we create a new autocomplete function that
-/// merges the results from cargo's autocomplete function (if it exists)
-/// and our own autocomplete function.
-/// Hacky as all hell unfortunately as we're using a regex to inject
-/// our extra function into clap's original script
-fn _write_bash_autocomplete_script(
-    name: &str,
-    cmd: &str,
-    clap_completion_script: &str,
-    mut dest: impl io::Write,
-) -> io::Result<()> {
-    writeln!(
-        &mut dest,
-        "{}",
-        minijinja::render!(
-            include_str!("autocomplete_cargo_shim.bash"),
-            cmd,
-            name,
-            clap_completion_script
-        )
-    )
 }

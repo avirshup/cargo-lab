@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use clap::builder::Styles;
 use clap::{Args, Command, Parser, Subcommand};
-use color_print::{cformat, cstr};
+use color_print::cformat;
 
 use super::completions::{
     manifest_path_completer, script_name_completer, template_name_completer,
@@ -299,46 +299,65 @@ impl WriteCompletionScript {
         let this_cmd =
             cmd.get_bin_name().unwrap_or("cargo-playground completions");
 
-        let bash_and_zsh_cargo_subcmd_caveat = match &invocation {
-            InvocationType::CargoSubcmd { .. } => cstr!(
-                r#"<yellow>NB:</> To avoid conflicts with completions for other cargo commands, activate <cyan>cargo</>'s completions <underline>first</>!
-(e.g., run <cyan>source <<(rustup completions cargo bash)</> before this one in your profile)
-"#
+        let invoked_cmd = invocation.invoked_cmd();
+
+        let zsh_lazy_load_instructions = match &invocation {
+            InvocationType::Direct { .. } => cformat!(
+                r#"
+  $ <bright-cyan,bold>{this_cmd} zsh >> ~/.zfunc/_{invoked_cmd}</>"#
             ),
-            InvocationType::Direct(_) => "",
+            InvocationType::CargoSubcmd { .. } => cformat!(
+                r#"
+  $ <bright-cyan,bold>rustup completions zsh cargo >> ~/.zfunc/_{invoked_cmd}</>
+  $ <bright-cyan,bold>{this_cmd} zsh >>>> ~/.zfunc/_{invoked_cmd}</>"#
+            ),
         };
 
+        // NB! ">>" will be transformed into ">" by `color_print`!
+        // To make it print "cmd >> file", write "cmd >>>> file"!
         let helpstr = cformat!(
-            r#"This command emits <italic>shell scripts</> that can be used to enable dynamic tab completion in various shells.
+            r#"This command emits shell scripts that can be used to enable dynamic tab completion in recent versions of shells.
 
-<bright-green,bold>Shell autocompletion tips</>
-Please note that these steps should work for most common shell setups, but may require further customization to the emitted scripts; you may need to check your shell's documentation.
+<bright-green,bold>Activating tab completion in supported shells</>
+
+<bold,underline>Bash:</>
+
+To activate completions <bold>for the current session</>:
+  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
+
+To make these completions available <bold>automatically</>, add "<cyan>source <<({this_cmd} bash)</>" to your startup script (usually this will be one of <blue>~/.bashrc</>, <blue>~/.bash_profile</>, or <blue>~/.profile</>).
 
 <bold,underline>Fish:</>
-To activate completions for the current session:
 
+To activate completions <bold>for the current session</>:
   $ <bright-cyan,bold>{this_cmd} fish | source</>
 
-Place this command in your <blue>~/.config/fish/config.fish</>
-to activate it for every session.
+To make these completions available <bold>automatically</>:
+ $ <bright-cyan,bold>{this_cmd} fish >> ~/.config/fish/completions/{invoked_cmd}.fish</>
 
-<bold,underline>Bash/zsh:</>
-{bash_and_zsh_cargo_subcmd_caveat}
-To activate completions for the current session, either:
+<bold,underline>Zsh:</>
 
-  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
-or
+To activate completions <bold>for the current session</>:
   $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
+
+To make these completions available <bold>automatically</> (assuming <blue>~/.zfunc</> is in your <blue>$fpath</>):{zsh_lazy_load_instructions}
+
+Tips for ZSH:
+ - The "compinit" module will need to have been activated. (usually via "<cyan>autoload -U compinit; compinit</>" in your startup script.)
+
+ - If <blue>~/.zfunc</> is not in your <blue>$fpath</>, either replace it with the appropriate directory, or add "<cyan>fpath+=~/.zfunc</>" to your shell's startup script <italic>prior</> to loading compinit.
+
+
+<bright-green,bold>Caveats for all shells</>
+Please note that:
+
+ - the scripts generated here <italic>and</> and setup instructions above will be different depending on whether you're calling this through cargo ("<cyan>cargo playground</>") or directly ("<cyan>cargo-playground</>");
+
+ - the scripts may require further tweaking in highly customized shell setups; and
+
+ - completions have only been tested with <italic>recent releases</> of the supported shells.
 "#
         );
-
-        // // NOTE: in fish, lazy loading a script with `cargo playground completions fish | source`
-        // //    doesn't work, and in fact breaks autocomplete for cargo entirely
-        // //    (note - eval doesn't work either, nor does even just sourcing it from another file?).
-        // //    No idea why.
-        // let invoked_cmd = invocation.invoked_cmd();
-        //  r"#To lazily load these completions for every session, run
-        //  $ <bright-cyan,bold>{this_cmd} fish > ~/.config/fish/completions/{invoked_cmd}.fish"#</>
 
         cmd.after_help(helpstr)
     }
