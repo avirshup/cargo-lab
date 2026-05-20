@@ -46,13 +46,16 @@ winnow = { version = "1.0.1", optional = true }
 camino = "1.2.2"
 
 # Trust: very high (by @mitsuhiko, many audits, no transitive deps)
-similar = { version = "3.1.0", features = ["inline"] }
+similar = { version = "3.1.0", features = ["inline"] } # provides diffs
+
+# Trust: very high (by @mitsuhiko, only dep is serde)
+minijinja = "2.20.0"
 
 # Trust: high (audit by mozilla, widely used)
 macro_rules_attribute = "0.2.2"
 
 
-# ───── DEV DEPS ───────────────────────────────────────────────── #
+# ───── TEST DEPS ──────────────────────────────────────────────── #
 [dev-dependencies]
 # Trust: very high (audit by mozilla, owned by @epage)
 assert_cmd = "2.2.1"
