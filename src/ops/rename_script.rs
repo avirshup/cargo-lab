@@ -75,7 +75,7 @@ pub fn rename_script(
     // done
     if then_edit {
         super::launch_editor::edit_script(
-            &orig_script.name,
+            Some(&orig_script.name),
             &None,
             ctx.reload(),
         )?;

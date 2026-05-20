@@ -144,7 +144,7 @@ fn run(args: cli::MainCli) -> Result<()> {
             script_name,
             editor_cmd,
         }) => {
-            ops::edit_script(&script_name, &editor_cmd, ctx)?;
+            ops::edit_script(script_name.as_deref(), &editor_cmd, ctx)?;
         },
 
         cli::SubCmd::WriteCompletionScript(cli::WriteCompletionScript {

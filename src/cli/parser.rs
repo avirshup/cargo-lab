@@ -251,9 +251,9 @@ pub struct ShowScriptInfo {
 #[apply(DeriveArg)]
 #[derive(Args)]
 pub struct EditScript {
-    /// name of the script to edit
+    /// name of the script to edit (if not present, opens the playground's root dir)
     #[arg(add = script_name_completer(), value_name = "SCRIPT")]
-    pub script_name: String,
+    pub script_name: Option<String>,
 
     /// Command to invoke editor
     ///
