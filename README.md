@@ -1,6 +1,6 @@
 # `cargo-playground`
 
-[![Crates.io](https://img.shields.io/crates/v/cargo-playground?style=flat-square)](https://crates.io/crates/clap)
+[![Crates.io](https://img.shields.io/crates/v/cargo-playground?style=flat-square)](https://crates.io/crates/cargo-playground)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 A cargo plugin for quick, disposable, local, and IDE-friendly Rust "playground" scripts with arbitrary dependencies.
@@ -14,15 +14,17 @@ It currently supports all of rust's "unix" systems (e.g., macos and linux).
 * [`cargo-playground`](#cargo-playground)
     * [Contents](#contents)
     * [What is this for?](#what-is-this-for)
-        * [WARNING: This is not a sandbox.](#warning-this-is-not-a-sandbox)
+        * [<a id="hygiene"><sup>†</sup></a>WARNING: This is not a sandbox.](#a-idhygienesupsupawarning-this-is-not-a-sandbox)
     * [Quick start](#quick-start)
     * [The basic idea](#the-basic-idea)
-        * [Workflows](#workflows)
-            * [Setup](#setup)
-            * [Creating scripts](#creating-scripts)
-            * [Working with scripts](#working-with-scripts)
+    * [Useful commands](#useful-commands)
+        * [Installation and setup](#installation-and-setup)
+        * [Creating playgrounds projects](#creating-playgrounds-projects)
+        * [Creating scripts in playgrounds](#creating-scripts-in-playgrounds)
+        * [Working with scripts](#working-with-scripts)
         * [Example](#example)
     * [Configuration](#configuration)
+        * [Shell autucomplete](#shell-autucomplete)
         * [In `Cargo.toml`](#in-cargotoml)
     * [Why?](#why)
         * [Alternatives](#alternatives)
@@ -44,21 +46,17 @@ crates. `cargo playground`'s goal is to make it as fast and easy to do this:
 
 Don't run untrusted code or dependencies without protection. <!-- TODO: add more plausibly deniable euphemisms -->
 
-A `cargo playground`-managed "playground" is local cargo project; the same security
-that apply to any cargo project apply here. Running
-`cargo playground run $script` will execute
-`cargo run --bin $script --features "[...]` - it builds your program _and all of
-its dependencies_ and then executes it.
-
-Running a malicious playground script
-or even just *building* a malicious dependency
+A `cargo playground`-managed "playground" is just a local cargo project;
+the same security principles apply.
+Running a malicious playground script or dependency -
+or even just *building* a malicious dependency -
 is [exactly](https://github.com/rust-lang/cargo/security/advisories/GHSA-rfj2-q3h3-hm5j) [as](https://github.com/rust-lang/cargo/security/advisories/GHSA-jq42-7mfv-hm57) [dangerous](https://blog.rust-lang.org/2025/09/24/crates.io-malicious-crates-fasterlog-and-asyncprintln/) here as it would be in any other cargo project.
 
 ## Quick start
 
 This program is designed to run as a cargo subcommand, and can be installed via
 `cargo install cargo-playground`. (To setup tab-completion
-in your shell, run `cargo playground completions --help`).
+in your shell, see `cargo playground completions --help`).
 
 You can then set up a new "playground" project:
 
@@ -242,7 +240,7 @@ instead of through cargo
 modifications to your project unless this table is present.
 
 ```toml
-[package.metadata.playground]
+[package.metadata.cargo-playground]
 # cargo-playground won't make changes to any project unless
 #    unless this field exists and is set to "true":
 enabled = true
