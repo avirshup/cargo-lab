@@ -23,12 +23,24 @@
         - Oh - it's because we now check to ensure that we're really running
           the correct cargo subcmd before generating completions ... but that
           doesn't work if there's an alias.
-        - To fix: currently can check `CARGO_ALIAS_$(to-upper subcmd)` and, if that's
-          not set, check output of `cargo --list`. Unfortunately the latter is not
-          _really_ designed to be machine-readable and there may be escaping problems.
-          The latter will definitely be pretty slow unfortunately.
-        - Fix when stable: can run
-          `cargo +nightly -Z unstable-options config get alias.$subcmd`
+        - Fixes?
+            - currently can check `CARGO_ALIAS_$(to-upper subcmd)` and, if that's
+              not set, check output of
+              `cargo --list`. Unfortunately the latter is not
+              _really_ designed to be machine-readable and there may be escaping problems.
+              The latter will definitely be pretty slow unfortunately.
+            - Or, hell, put "cargo-alias-playground" into our metadata? Although then
+              we have to read cargo.toml every single time there's a cargo autocomplete request
+              we don't recognize (although could hardcode a list of commands we don't respond to)
+                - not that reading one file every time is a particularly big deal
+            - Fix when stable: can run
+              `cargo +nightly -Z unstable-options config get alias.$subcmd`
+        - The CLASSES of fixes:
+            - workarounds: require extra config to be provided (requires i/o or at least env vars)
+            - discovery: figure out what the aliases actually are from context clues and/or
+              future cargo feature stabilization (requires i/o)
+            - wishful thinking: cargo gets features to allow more cooperativity w.r.t. autocomplete
+              for plugins (maybe when they stabilize the dynamic autocomplete some day?)
     - [ ] in `bash` (and `zsh`)
       `source <(cargo playground completions bash)` overrides
       the effect of `source <(rustup completions bash cargo)`, and vice versa.
@@ -151,10 +163,10 @@
       clap's autocomplete method unless we're sure that our subcommand
       has been invoked)
 
-- [ ] autocomplete - playing nice w/ others
-    - [ ] in bash: sourcing our autocompletions overrides the native
+- [x] autocomplete - playing nice w/ others
+    - [x] in bash: sourcing our autocompletions overrides the native
       `cargo` completions
-    - [ ] in fish:
+    - [x] in fish:
       *sourcing* our completions does not override the native completions.
       But adding a `cargo.fish` to our completions directory DOES override the native
       completions (presumably because it stops looking for completions to lazy-load
@@ -194,6 +206,7 @@
     - somehow screen it so that it only invokes our autocomplete for "cargo xtask"
       when running in the correct workspace? In the shell script, filters
       on the CWD or something?
+    - OR remove the xtask stuff entirely (<- actually probably this)
 
 ### A proper output handling system
 
@@ -208,8 +221,6 @@
 
 ### Tech debt
 
-- [ ] Take more steps to manage printing to stdout (it will break autocomplete
-  if we don't ...)
 - ~~[ ] Migrate the passthrough args to a declarative derive
   macro~~: yeah no this is not worth it
     - Observation: a macro that reads like "build me a struct like this",
@@ -222,16 +233,18 @@
       be an error if it's something you don't support. I.e., it's much easier
       to create a limited DSL than it is to integrate with rust the language.
       Which I guess makes sense.
-- [ ] make it work on **windows** (spawn in `cpg run` instead of
+- [ ] make it work on **windows** (spawn instead of
   exec, format paths correctly, make color work)
 
 #### Nice to have
 
 - [x] Parse `-F/--feature` the same way as cargo (i.e., allow for multiple
   space-comma separated features in a single argument)
-- [ ] add (optionalyl) "extern crate" statements and/or comments to the
+- [ ] add (optionally) "extern crate" statements and/or comments to the
   top of each script when dependencies and/or features are added?
-- [ ] use styles from `cli_style` for output everywhere
+- [ ] use cargo's styles from `cli_style` for output everywhere
+- [ ] parse module-level docstrings from scripts so that you can display / search through
+  them on the CLI?
 - [x]  `cargo playground init` -
   to create a whole-ass new project or enable metadata on existing one
     - [x] ~~optionally initialize as xtask? (i.e., add this code to the
@@ -242,12 +255,13 @@
   **templates**, + tell user where stored, how to modify
 - [ ] **Version conflicts**: what happens if `cpg new script1 dep@0.1.2` then
   `cpg new script2 dep@0.5.0`?
-    - right now, it will update the version for all scripts, which is _surprising_
+    - right now, it will update the version for all scripts, which is
+      _surprising_ (i.e., bad)
     - most flexible: allow multiple versions via renaming
     - much simpler: warn before proceeding
     - even simpler than that: warn + do nothing + advise user to use
       `cargo add --optional` to manage versions?
-- [ ] Don't exec out to `diff`, a dependency is fine for that
+- [x] Don't exec out to `diff`, a dependency is fine for that
 
 ## QOL / usability
 
@@ -255,7 +269,7 @@
 - [x] **ANSI color help styling** using the same style as cargo
 - [x] `cpg new`: allow specifying deps at same time as creating new script
 - [ ] `Arguments for cargo add` section has too much whitespace
-- [ ] include `cargo add`'s changes to dependencies when we run `diff`
+- [x] include `cargo add`'s changes to dependencies when we run `diff`
 - [ ] Don't say "Updated Cargo.toml" if nothing changed
 - [x] Don't run cargo add if no deps will change
 
@@ -270,7 +284,8 @@ These are "pedantic" if they're low likelihood or just Not A Big Deal if they ha
   "AI" agents might do this but I don't care about them.)
 - [ ] ensure two scripts w/ different names don't point to same file?
 - [x] ensure bin entries don't have duplicate names
-- [ ] dependency consistency (what did I mean by this?)
+- [ ] dependency consistency
+    - [ ] what did I mean by this?
 
 Note:
 
