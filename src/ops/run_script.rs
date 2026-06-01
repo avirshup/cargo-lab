@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::os::unix::prelude::CommandExt;
 use std::process;
 
@@ -6,9 +7,11 @@ use crate::util;
 
 /// Run the requested script via `cargo run` and activating the desired features
 ///
-/// ONLY RETURNS UPON FAILURE - if everything works right,
+/// Unix: ONLY RETURNS UPON FAILURE - if everything works right,
 /// this `exec`s the cargo run
 /// command, so the invoked process replaces this one.
+///
+/// (On non-unix platforms it returns normally.)
 pub fn run_script(
     bin_name: &str,
     args: &[String],
@@ -35,7 +38,15 @@ pub fn run_script(
 
     util::show_invocation(&cmd);
 
-    // this won't ever return under normal circumstances
-    let exec_failure = cmd.exec();
-    Err(crate::ioerr!(exec_failure, "Failed exec '{cmd:?}`"))
+    #[cfg(unix)]
+    {
+        // this won't ever return under normal circumstances
+        let exec_failure = cmd.exec();
+        Err(crate::ioerr!(exec_failure, "Failed exec '{cmd:?}`"))
+    }
+
+    #[cfg(not(unix))]
+    {
+        util::run_subproc(cmd).map(|_| ())
+    }
 }
