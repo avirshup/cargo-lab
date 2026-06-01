@@ -167,6 +167,7 @@ tests:
         BUILD +dep-check
         BUILD +test-unit
     END
+    BUILD +lint-readme  # <- not in WAIT block, it shouldn't block the main tests
     BUILD +test-e2e
     BUILD +test-shell-autocomplete
 
@@ -180,7 +181,6 @@ lints:
     DO rust+CARGO --args="check"
     DO rust+CARGO --args="+nightly fmt --check -v"
     DO rust+CARGO --args="clippy -v"
-
 
 dep-check:
     FROM +build-env
@@ -208,6 +208,13 @@ test-shell-autocomplete:
     COPY tests/shell/test_shell_completion_integration.sh ./
     RUN bash test_shell_completion_integration.sh
 
+lint-readme:
+    FROM node:lts-alpine3.22
+    RUN npm install --global prettier@3.8.3
+
+    WORKDIR /src
+    COPY .prettierrc.yml README.md .
+    RUN prettier -c .prettierrc.yml --check README.md
 
 # ──────────────────────────────────────────────────────────────────────── #
 # ───── Outputs                                                      ───── #
@@ -270,3 +277,5 @@ build-cargo-deny:
     FROM +build-env
     DO rust+CARGO --args="install --locked cargo-deny"
     SAVE ARTIFACT "$CARGO_HOME/bin/cargo-deny"
+
+
