@@ -4,9 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 A cargo plugin for quick, disposable, local, and IDE-friendly Rust "playground"
-scripts with arbitrary dependencies.
-
-It currently supports rust's "unix" systems (e.g., macos and linux).
+scripts with arbitrary dependencies, and should work on all standard rust
+targets.
 
 ## Contents
 
