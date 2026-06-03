@@ -8,8 +8,8 @@ macro_rules! expose_mod {
 }
 
 expose_mod!(add_deps_to_script);
-expose_mod!(check_playground);
-expose_mod!(init_playground);
+expose_mod!(check_lab);
+expose_mod!(init_lab);
 expose_mod!(launch_editor);
 expose_mod!(list_and_display_scripts);
 expose_mod!(new_script);

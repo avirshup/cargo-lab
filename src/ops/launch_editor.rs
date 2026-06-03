@@ -27,7 +27,7 @@ pub fn edit_script(
     let cmd_entrypoint = custom_cmd
         .as_ref()
         .or_else(|| {
-            ctx.playground_config()
+            ctx.lab_config()
                 .as_ref()
                 .and_then(|cfg| cfg.editor_cmd.as_ref())
         })

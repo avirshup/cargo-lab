@@ -6,11 +6,11 @@ pub use Verbosity::*;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::Deserialize;
 
-use crate::manifest_data::{ManifestData, PlaygroundConfig};
+use crate::manifest_data::{LabConfig, ManifestData};
 use crate::manifest_editor::ManifestEditor;
 use crate::{data, util};
 
-pub const CARGO_PLAYGROUND_MANIFEST_DIR: &str = "CARGO_PLAYGROUND_MANIFEST_DIR";
+pub const CARGO_LAB_MANIFEST_DIR: &str = "CARGO_LAB_MANIFEST_DIR";
 
 #[cfg(feature = "xtask")]
 const ENV_XTASK_MANIFEST_PATH: &str = "CARGO_MANIFEST_DIR";
@@ -47,7 +47,7 @@ type CachedResult<'a, T> = Result<&'a T, &'a crate::Error>;
 ///
 /// 1. The `override_manifest_path` passed to [`GlobalCtx::new`]
 ///    (usually this will come from the `--manifest-path` CLI option),
-/// 2. the value of the `CARGO_PLAYGROUND_MANIFEST_DIR` env var;
+/// 2. the value of the `CARGO_LAB_MANIFEST_DIR` env var;
 /// 3. in `cfg(feature=xtask)` mode only, the first
 ///    parent of the `$CARGO_MANIFEST_DIR` env var
 /// 4. The `$cwd` or first parent thereof contains Cargo.toml.
@@ -66,7 +66,7 @@ pub struct GlobalCtx {
     _project_paths: OnceCell<crate::Result<ProjectPaths>>,
     _manifest_raw: OnceCell<crate::Result<String>>,
     _manifest_data: OnceCell<crate::Result<ManifestData>>,
-    _playground_config: OnceCell<Option<PlaygroundConfig>>,
+    _lab_config: OnceCell<Option<LabConfig>>,
 }
 
 impl GlobalCtx {
@@ -99,7 +99,7 @@ impl GlobalCtx {
             _project_paths: Default::default(),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
-            _playground_config: Default::default(),
+            _lab_config: Default::default(),
         }
     }
 
@@ -113,7 +113,7 @@ impl GlobalCtx {
             _project_paths: OnceCell::from(Ok(paths)),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
-            _playground_config: Default::default(),
+            _lab_config: Default::default(),
         }
     }
 
@@ -130,7 +130,7 @@ impl GlobalCtx {
             _project_paths: self._project_paths.clone(),
             _manifest_raw: Default::default(),
             _manifest_data: Default::default(),
-            _playground_config: Default::default(),
+            _lab_config: Default::default(),
         }
     }
 
@@ -170,12 +170,12 @@ impl GlobalCtx {
             .as_ref()
     }
 
-    pub fn playground_config(&self) -> &Option<PlaygroundConfig> {
-        self._playground_config.get_or_init(|| {
+    pub fn lab_config(&self) -> &Option<LabConfig> {
+        self._lab_config.get_or_init(|| {
             self.manifest_data()
                 .as_ref()
                 .ok()
-                .and_then(|x| x.playground_config().cloned())
+                .and_then(|x| x.lab_config().cloned())
         })
     }
 
@@ -183,17 +183,15 @@ impl GlobalCtx {
     /// state. Unlike most of the other methods here, this is *not* cached
     /// (it constructs a new editor every time it is called).
     pub fn new_editor(&self) -> crate::Result<ManifestEditor> {
-        let Some(pgcfg) = self.playground_config() else {
+        let Some(pgcfg) = self.lab_config() else {
             return Err(crate::Error::NoConfig(
-                "`[package.metadata.cargo-playground]` table not present"
-                    .to_owned(),
+                "`[package.metadata.cargo-lab]` table not present".to_owned(),
             ));
         };
 
         if !pgcfg.enabled {
             return Err(crate::Error::ManifestNotEditable(
-                "In `[package.metadata.cargo-playground]`, `enabled` is not \
-                 `true`"
+                "In `[package.metadata.cargo-lab]`, `enabled` is not `true`"
                     .to_owned(),
             ));
         }
@@ -204,7 +202,7 @@ impl GlobalCtx {
     }
 }
 
-/// Paths for a given playground project.
+/// Paths for a given lab project.
 ///
 /// This struct's constructors will check that  `manifest_dir` is
 /// a directory that exists (at construction time anyway), but none
@@ -236,8 +234,7 @@ impl ProjectPaths {
 
     /// Try to figure out which project path the user wants, based on env vars and CWD.
     pub fn discover(cwd: &Utf8Path) -> crate::Result<Self> {
-        if let Ok(path) = _getenv::<Utf8PathBuf>(CARGO_PLAYGROUND_MANIFEST_DIR)
-        {
+        if let Ok(path) = _getenv::<Utf8PathBuf>(CARGO_LAB_MANIFEST_DIR) {
             return Self::from_manifest_dir(&path);
         }
 
@@ -349,7 +346,7 @@ const MANIFEST_MAX_SEARCH_DEPTH: u8 = 5;
 /// Return the first enclosing directory that contains a Cargo.toml
 ///
 /// This does not do anything related to workspaces or whatever,
-/// and really only works for the playground model.
+/// and really only works for the lab model.
 fn _first_parent_dir_with_a_manifest_in_it(
     starting_dir: &Utf8Path,
 ) -> crate::Result<Utf8PathBuf> {

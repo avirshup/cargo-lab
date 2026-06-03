@@ -83,7 +83,7 @@ pub(super) fn run_cargo_add(
 /// Built-in template for a minimal script
 pub(super) fn minimal_script(name: &str) -> String {
     format!(
-        r#"// playground script: {name}
+        r#"// lab script: {name}
 
 fn main() {{
     println!("hello from world")

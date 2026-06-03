@@ -67,7 +67,7 @@ pub enum Error {
 
     #[error(
         "To launch an editor, please set the 'editor-cmd' key in the \
-         '[project.metadata.cargo-playground]' table in `Cargo.toml`"
+         '[project.metadata.cargo-lab]' table in `Cargo.toml`"
     )]
     NeedEditorCmd(),
 

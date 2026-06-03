@@ -28,5 +28,5 @@ pub const CLAP_RENAME: &str = "clap-greeter";
 pub const INIT_SCRIPT: &str = "my-first-script";
 
 // from cli::invocations module:
-pub const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_DIRECT";
-pub const SUBCMD_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_SUBCMD";
+pub const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_LAB_DIRECT";
+pub const SUBCMD_COMPLETE_VAR: &str = "COMPLETE_CARGO_LAB_SUBCMD";

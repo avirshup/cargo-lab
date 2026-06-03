@@ -4,13 +4,13 @@ version = "0.0.0-unset"  # do not change manually, will be assigned in CI
 edition = "2024"
 include = ["src/", "tests/", "templates/", "./README.md", "./NOTICES.md", "./LICENSE", "deny.toml"]
 license = "MIT"
-homepage = "https://github.com/avirshup/cargo-playground"
+homepage = "https://github.com/avirshup/cargo-lab"
 description = "A cargo plugin for managing a project full of one-off scripts."
 categories = ["development-tools::cargo-plugins", "command-line-utilities"]
-keywords = ["cargo", "playground", "script", "cargo-subcommand", "cli"]
+keywords = ["cargo", "lab", "script", "cargo-subcommand", "cli"]
 
 [[bin]]
-name = "cargo-playground"
+name = "cargo-lab"
 path = "src/main.rs"
 
 [features]

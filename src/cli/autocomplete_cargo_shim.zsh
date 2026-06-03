@@ -14,11 +14,11 @@ _zsh_registered_completion_fn() {
 }
 
 # ───── The actual completion function ─────────────────────────────────── #
-_CARGO_PG_PARENT_COMPLETER=$(_zsh_registered_completion_fn "{{cmd}}")
+_CARGO_LAB_PARENT_COMPLETER=$(_zsh_registered_completion_fn "{{cmd}}")
 
-_complete_cargo_pg_combined() {
-  if test -n "$_CARGO_PG_PARENT_COMPLETER"; then
-    "$_CARGO_PG_PARENT_COMPLETER" "$@"
+_complete_cargo_lab_combined() {
+  if test -n "$_CARGO_LAB_PARENT_COMPLETER"; then
+    "$_CARGO_LAB_PARENT_COMPLETER" "$@"
   fi
 
   _clap_dynamic_completer_{{name}} "$@"
@@ -31,4 +31,4 @@ _complete_cargo_pg_combined() {
 
 # ───── Registration ───────────────────────────────────────────── #
 # *override* clap script's registration with our "combined" provider
-compdef _complete_cargo_pg_combined {{cmd}}
+compdef _complete_cargo_lab_combined {{cmd}}

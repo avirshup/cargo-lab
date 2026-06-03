@@ -23,7 +23,7 @@ pub(super) const STYLES: Styles = Styles::styled()
     .valid(style::VALID)
     .invalid(style::INVALID);
 
-/// Manage script playgrounds as cargo projects
+/// Manage script labs as cargo projects
 #[derive(Clone, Debug, Parser)]
 #[command(version, about, long_about = None, styles = STYLES)]
 pub struct MainCli {
@@ -39,7 +39,7 @@ pub struct GlobalArgs {
     /// Path to directory w/ Cargo.toml
     ///
     /// If not passed, this defaults to
-    /// the env var "CARGO_PLAYGROUND_MANIFEST_DIR" if it is set,
+    /// the env var "CARGO_LAB_MANIFEST_DIR" if it is set,
     /// otherwise discovered by searching the current working
     /// directory and its parents for "Cargo.toml"
     #[arg(
@@ -68,11 +68,11 @@ pub struct GlobalArgs {
 // ───── Top-level subcmd enum ──────────────────────────────────── //
 #[derive(Clone, Debug, Subcommand)]
 pub enum SubCmd {
-    /// Create a new playground
+    /// Create a new lab
     #[command(name = "init")]
-    InitPlayground(InitPlayground),
+    InitLab(InitLab),
 
-    /// Run a playground script
+    /// Run a lab script
     #[command(name = "run")]
     RunScript(RunScript),
 
@@ -88,7 +88,7 @@ pub enum SubCmd {
     #[command(name = "rename")]
     RenameScript(RenameScript),
 
-    /// List all scripts in playground
+    /// List all scripts in lab
     #[command(name = "list")]
     ListScripts,
 
@@ -119,10 +119,10 @@ pub enum SubCmd {
 // ──────────────────────────────────────────────────────────────────────── //
 // ───── Subcommands                                                 ───── //
 // ──────────────────────────────────────────────────────────────────────── //
-/// Create a new playground
+/// Create a new lab
 #[derive(Clone, Debug, Args)]
-pub struct InitPlayground {
-    /// Path to initialize a as playground.
+pub struct InitLab {
+    /// Path to initialize a as lab.
     ///
     /// Can be: a path that does not exist, an empty directory, or
     /// an existing cargo project (must also pass `--existing`)
@@ -131,13 +131,13 @@ pub struct InitPlayground {
 
     // // TODO: either use arg group to make `--existing` mutually
     // //   exclusive of others, or make separate commands
-    // /// Name of the playground "package", if not already set.
-    // /// (defaults to "{directory-name}-playground")
+    // /// Name of the lab "package", if not already set.
+    // /// (defaults to "{directory-name}-lab")
     // #[arg(action=clap::ArgAction::SetTrue)]
     // pub existing: bool,
     //
-    /// Name of the playground "package", if not already set.
-    /// (defaults to "{directory-name}-playground")
+    /// Name of the lab "package", if not already set.
+    /// (defaults to "{directory-name}-lab")
     #[arg()]
     pub name: Option<String>,
 
@@ -148,7 +148,7 @@ pub struct InitPlayground {
     pub edition: String,
 }
 
-/// Run an existing script from the playground
+/// Run an existing script from the lab
 #[derive(Args, Clone, Debug)]
 pub struct RunScript {
     #[arg(
@@ -162,7 +162,7 @@ pub struct RunScript {
     pub args: Vec<String>,
 }
 
-/// Create a new playground script
+/// Create a new lab script
 #[derive(Clone, Debug, Args)]
 pub struct NewScript {
     /// Name of the script to create (optional).
@@ -184,8 +184,8 @@ pub struct NewScriptOpts {
         long,
         help = "Open the script in editor after creating it.",
         long_help = "Open the script in editor after creating it \
-                     (`package.metadata.cargo-playground.editor-cmd` must be \
-                     set in manifest.)"
+                     (`package.metadata.cargo-lab.editor-cmd` must be set in \
+                     manifest.)"
     )]
     pub edit: bool,
 
@@ -193,7 +193,7 @@ pub struct NewScriptOpts {
     pub inject_args: InjectArgs,
 }
 
-/// Create a new playground script
+/// Create a new lab script
 #[derive(Clone, Debug, Args)]
 pub struct RenameScript {
     /// Name of the script to be renamed
@@ -205,7 +205,7 @@ pub struct RenameScript {
 
     /// Open the script in editor after this operation.
     ///
-    /// (`package.metadata.cargo-playground.editor-cmd` must be set in the manifest.)"
+    /// (`package.metadata.cargo-lab.editor-cmd` must be set in the manifest.)"
     #[arg(long)]
     pub edit: bool,
 }
@@ -224,7 +224,7 @@ pub struct InjectDeps {
 
     /// Open the script in editor after installing the dependencies.
     ///
-    /// (`package.metadata.cargo-playground.editor-cmd` must be set in the manifest.)"
+    /// (`package.metadata.cargo-lab.editor-cmd` must be set in the manifest.)"
     #[arg(long)]
     pub edit: bool,
 
@@ -242,13 +242,13 @@ pub struct ShowScriptInfo {
 /// Open script in editor
 #[derive(Clone, Debug, Args)]
 pub struct EditScript {
-    /// name of the script to edit (if not present, opens the playground's root dir)
+    /// name of the script to edit (if not present, opens the lab's root dir)
     #[arg(add = script_name_completer(), value_name = "SCRIPT")]
     pub script_name: Option<String>,
 
     /// Command to invoke editor
     ///
-    /// Can be omitted if `package.metadata.cargo-playground.editor-cmd` is set.
+    /// Can be omitted if `package.metadata.cargo-lab.editor-cmd` is set.
     ///
     /// All arguments after this flag ('--cmd') will be interpreted as
     /// the arguments to invoke the editor.
@@ -285,9 +285,8 @@ impl WriteCompletionScript {
 
         // `get_bin_name()` is not the bin name, it
         // actually returns the bin name _with the subcommand already appended to it_
-        // (e.g., "cargo-playground completions")
-        let this_cmd =
-            cmd.get_bin_name().unwrap_or("cargo-playground completions");
+        // (e.g., "cargo-lab completions")
+        let this_cmd = cmd.get_bin_name().unwrap_or("cargo-lab completions");
 
         let invoked_cmd = invocation.invoked_cmd();
 
@@ -345,7 +344,7 @@ Tips for ZSH:
 <bright-green,bold>Caveats for all shells</>
 Please note that:
 
- - the scripts generated here <italic>and</> and setup instructions above will be different depending on whether you're calling this through cargo ("<cyan>cargo playground</>") or directly ("<cyan>cargo-playground</>");
+ - the scripts generated here <italic>and</> and setup instructions above will be different depending on whether you're calling this through cargo ("<cyan>cargo lab</>") or directly ("<cyan>cargo-lab</>");
 
  - the scripts may require further tweaking in highly customized shell setups; and
 

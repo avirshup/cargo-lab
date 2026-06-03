@@ -22,12 +22,12 @@ _bash_registered_completion_fn() {
 }
 
 # ───── The actual completion function ─────────────────────────────────── #
-_CARGO_PG_PARENT_COMPLETER=$(_bash_registered_completion_fn "{{cmd}}")
+_CARGO_LAB_PARENT_COMPLETER=$(_bash_registered_completion_fn "{{cmd}}")
 
-_complete_cargo_pg_combined() {
+_complete_cargo_lab_combined() {
   local all_completions=()
-  if test -n "$_CARGO_PG_PARENT_COMPLETER"; then
-    "$_CARGO_PG_PARENT_COMPLETER" "$@"
+  if test -n "$_CARGO_LAB_PARENT_COMPLETER"; then
+    "$_CARGO_LAB_PARENT_COMPLETER" "$@"
     all_completions+=("${COMPREPLY[@]}")
   fi
 
@@ -41,11 +41,11 @@ _complete_cargo_pg_combined() {
 
 
 # ───── Registration ───────────────────────────────────────────── #
-if test -n "$_CARGO_PG_PARENT_COMPLETER"; then
+if test -n "$_CARGO_LAB_PARENT_COMPLETER"; then
     # overwrite the completion registration (again) with our function
     if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
-      complete -o nospace -o bashdefault -o nosort -F _complete_cargo_pg_combined "{{cmd}}"
+      complete -o nospace -o bashdefault -o nosort -F _complete_cargo_lab_combined "{{cmd}}"
   else
-      complete -o nospace -o bashdefault -F _complete_cargo_pg_combined "{{cmd}}"
+      complete -o nospace -o bashdefault -F _complete_cargo_lab_combined "{{cmd}}"
   fi
 fi

@@ -21,10 +21,10 @@ function __load_lazy_completions \
     -d "attempt to manually activate completions for the provided command"
 
     # Extra guard against this script sourcing itself
-    if set -q _CARGO_PG_COMPLETION_ACTIVATING
+    if set -q _CARGO_LAB_COMPLETION_ACTIVATING
         return 1
     end
-    set -gx _CARGO_PG_COMPLETION_ACTIVATING "$cmd"
+    set -gx _CARGO_LAB_COMPLETION_ACTIVATING "$cmd"
 
     # Try to source any existing autocompletion script for this command
     for dirpath in $fish_complete_path (__find_fish_builtin_completiondir)
@@ -36,7 +36,7 @@ function __load_lazy_completions \
         end
     end
 
-    set -eg _CARGO_PG_COMPLETION_ACTIVATING
+    set -eg _CARGO_LAB_COMPLETION_ACTIVATING
 end
 
 __load_lazy_completions "{{cmd}}"

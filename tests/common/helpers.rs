@@ -5,7 +5,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_print::ceprintln;
 use tempfile::tempdir;
 
-const BIN_NAME: &str = "cargo-playground";
+const BIN_NAME: &str = "cargo-lab";
 
 #[derive(Debug)]
 pub struct ScratchDir(tempfile::TempDir);
@@ -71,10 +71,10 @@ impl<'dir> Runner<'dir> {
         self._runit(Command::new(exe_cmd), args)
     }
 
-    /// build and run the cargo playground executable with the
+    /// build and run the cargo lab executable with the
     /// given args
     #[must_use]
-    pub fn run_cpg(&self, args: &[&str]) -> ProcResult {
+    pub fn run_lab(&self, args: &[&str]) -> ProcResult {
         self._runit(
             Command::cargo_bin(BIN_NAME).expect("found cargo exe"),
             args,
@@ -130,7 +130,7 @@ impl<'dir> Runner<'dir> {
 
     pub fn consistency_checks(&self) {
         self.run_cargo(&["check"]).expect_ok();
-        self.run_cpg(&["check"]).expect_ok();
+        self.run_lab(&["check"]).expect_ok();
     }
 }
 

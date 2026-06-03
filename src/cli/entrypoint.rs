@@ -46,16 +46,16 @@ fn _run_normal_autocomplete_and_exit() {
 
 /// Called when we think we're generating autocompletions for
 /// an invocation of cargo itself. This needs to figure out 2 things:
-/// 1) Is the user even trying to run `cargo playground`?
+/// 1) Is the user even trying to run `cargo lab`?
 ///    (If not, then it's some other cargo command so
 ///    we need to output nothing and exit as quickly as possible.)
-/// 2) If so, we need to figure out how "playground" is spelled here (i.e.,
+/// 2) If so, we need to figure out how "lab" is spelled here (i.e.,
 ///    make it work even if the user renamed the executable or whatever)
 fn _run_cargo_subcmd_autocomplete_and_exit() {
     let mut arg_iter = env::args();
 
     // Figure out if we're being called as `cargo-subcmd -- cargo subcmd [args..]`
-    // (where "subcmd" is usually "playground")
+    // (where "subcmd" is usually "lab")
     // If it's of the form "cargo-subcmd -- cargo add" or something, then
     // we exit immediately - the user is running some other cargo cmd.
     let arg0 = arg_iter.next().expect("argv[0] exists");

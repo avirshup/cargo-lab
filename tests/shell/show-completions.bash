@@ -14,9 +14,9 @@ _get_completion_fn() {
 }
 
 # Does this work? It seems to work correctly for cargo
-# and git, but for `cargo{ |-}playground` it always
+# and git, but for `cargo{ |-}lab` it always
 # returns ALL of the completions (e.g., it suggests
-# `cargo playground inject` for "cargo playground ne").
+# `cargo lab inject` for "cargo lab ne").
 # HOWEVER the actual tab-completion does not have this issue,
 # so maybe there is a filtering step somewhere in bash that
 # we're not including here?

@@ -24,14 +24,14 @@
 set -eou pipefail
 
 # really basic tests to ensure autocomplete is still working
-# for both cargo _and_ -playground
+# for both cargo _and_ -lab
 function test_autocomplete_works() {
   assert_completion "cargo met" "metadata"
-  assert_completion "cargo play" "playground"
+  assert_completion "cargo la" "lab"
 
   assert_not_completion "cargo inj" "inject"
 
-  for cmd in "cargo playground" "cargo-playground"; do
+  for cmd in "cargo lab" "cargo-lab"; do
     assert_completion "$cmd inj" "inject"
 
     # # ensure not returning wrong completions

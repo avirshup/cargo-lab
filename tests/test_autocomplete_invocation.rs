@@ -18,7 +18,7 @@ fn test_completion_scripts_for_direct_invocation() {
     // direct calls
     for shell in TEST_SHELLS {
         runner
-            .run_cpg(&["completions", shell])
+            .run_lab(&["completions", shell])
             .expect_ok()
             .expect_stdout_contains(DIRECT_COMPLETE_VAR);
     }
@@ -38,7 +38,7 @@ fn test_completion_scripts_for_subcmd_invocation() {
     ]);
     for shell in TEST_SHELLS {
         runner_with_cargo_env_vars
-            .run_cpg(&["playground", "completions", shell])
+            .run_lab(&["lab", "completions", shell])
             .expect_ok()
             .expect_stdout_contains(SUBCMD_COMPLETE_VAR);
     }
@@ -53,7 +53,7 @@ fn test_subcommand_name_autocomplete_for_direct_invocation() {
         runner.with_env([(DIRECT_COMPLETE_VAR.to_owned(), "fish".to_owned())]);
     for subcmd in ALL_SUBCMDS {
         direct_completion_runner
-            .run_cpg(&["--", "cargo-playground", &subcmd[..2]])
+            .run_lab(&["--", "cargo-lab", &subcmd[..2]])
             .expect_ok()
             .expect_stdout_contains(subcmd);
     }
@@ -71,20 +71,20 @@ fn test_subcommand_name_autocomplete_for_subcmd_invocation() {
         runner.with_env([(SUBCMD_COMPLETE_VAR.to_owned(), "fish".to_owned())]);
     for subcmd in ALL_SUBCMDS {
         subcmd_completion_runner
-            .run_cpg(&["--", "cargo", "playground", &subcmd[..2]])
+            .run_lab(&["--", "cargo", "lab", &subcmd[..2]])
             .expect_ok()
             .expect_stdout_contains(subcmd);
     }
 
     // for cargo subcommand mode, ensure that it does NOT autocomplete anything for
-    // anything that doesn't start with "cargo playground"
+    // anything that doesn't start with "cargo lab"
     for cmd in [
         ["--", "cargo", ""],
         ["--", "cargo", "ini"],
-        ["--", "cargo", "playgr"],
+        ["--", "cargo", "la"],
     ] {
         subcmd_completion_runner
-            .run_cpg(&cmd)
+            .run_lab(&cmd)
             .expect_ok()
             .expect_stdout("");
     }
@@ -102,10 +102,10 @@ fn test_dynamic_autocomplete_mode_for_fish() {
     // set up a new project w/ 2 scripts
     let tempdir = ScratchDir::new();
     let mut runner = Runner::new(&tempdir);
-    runner.run_cpg(&["init", PROJECT_NAME]).expect_ok();
+    runner.run_lab(&["init", PROJECT_NAME]).expect_ok();
     runner.cd(PROJECT_NAME);
     runner
-        .run_cpg(&["new", SECOND_SCRIPT, "--offline"])
+        .run_lab(&["new", SECOND_SCRIPT, "--offline"])
         .expect_ok();
 
     // it's time for Will? It? Autocomplete!?!?!
@@ -114,14 +114,14 @@ fn test_dynamic_autocomplete_mode_for_fish() {
         let direct_completion_runner = runner
             .with_env([(DIRECT_COMPLETE_VAR.to_owned(), "fish".to_owned())]);
         direct_completion_runner
-            .run_cpg(&["--", "cargo-playground", "info", ""])
+            .run_lab(&["--", "cargo-lab", "info", ""])
             .expect_ok()
             .expect_stdout_contains(INIT_SCRIPT)
             .expect_stdout_contains(SECOND_SCRIPT);
 
         for script in [INIT_SCRIPT, SECOND_SCRIPT] {
             direct_completion_runner
-                .run_cpg(&["--", "cargo-playground", "inject", &script[..3]])
+                .run_lab(&["--", "cargo-lab", "inject", &script[..3]])
                 .expect_ok()
                 .expect_stdout_contains(script);
         }
@@ -133,14 +133,14 @@ fn test_dynamic_autocomplete_mode_for_fish() {
         let subcmd_completion_runner = runner
             .with_env([(SUBCMD_COMPLETE_VAR.to_owned(), "fish".to_owned())]);
         subcmd_completion_runner
-            .run_cpg(&["--", "cargo", "playground", "inject", ""])
+            .run_lab(&["--", "cargo", "lab", "inject", ""])
             .expect_ok()
             .expect_stdout_contains(INIT_SCRIPT)
             .expect_stdout_contains(SECOND_SCRIPT);
 
         for script in [INIT_SCRIPT, SECOND_SCRIPT] {
             subcmd_completion_runner
-                .run_cpg(&["--", "cargo", "playground", "info", &script[..3]])
+                .run_lab(&["--", "cargo", "lab", "info", &script[..3]])
                 .expect_ok()
                 .expect_stdout_contains(script);
         }

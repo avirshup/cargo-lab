@@ -65,13 +65,13 @@ crate:
 
     # artifacts for other steps
     SAVE ARTIFACT "VERSION"
-    SAVE ARTIFACT "./target/package/cargo-playground-${CRATE_VERSION}" crate-src
+    SAVE ARTIFACT "./target/package/cargo-lab-${CRATE_VERSION}" crate-src
     SAVE ARTIFACT --keep-ts \
-        "./target/package/cargo-playground-${CRATE_VERSION}.crate" \
-        "cargo-playground.crate"
+        "./target/package/cargo-lab-${CRATE_VERSION}.crate" \
+        "cargo-lab.crate"
 
     # output the crate (when this target is built directly)
-    SAVE ARTIFACT "./target/package/cargo-playground-${CRATE_VERSION}.crate" \
+    SAVE ARTIFACT "./target/package/cargo-lab-${CRATE_VERSION}.crate" \
         AS LOCAL "./artifacts/package/"
 
 
@@ -134,27 +134,27 @@ shell-testing-env:
     RUN mkdir -p ~/.config/fish/completions
 
 autocomplete-env:
-    # An image with cargo playground installed AND autocomplete configured
+    # An image with cargo lab installed AND autocomplete configured
     # fish, bash, and zsh. Outputs an image directly for manual testing
     # when invoked directly as a build target.
     FROM +shell-testing-env
 
-    COPY +exe/cargo-playground $CARGO_HOME/bin
+    COPY +exe/cargo-lab $CARGO_HOME/bin
 
     USER testuser
     WORKDIR $HOME
 
     # direct call setup
-    RUN echo 'source <(cargo-playground completions bash)' >> .bashrc
-    RUN cargo-playground completions zsh >> .zshrc
-    RUN cargo-playground completions fish > .config/fish/completions/cargo-playground.fish
+    RUN echo 'source <(cargo-lab completions bash)' >> .bashrc
+    RUN cargo-lab completions zsh >> .zshrc
+    RUN cargo-lab completions fish > .config/fish/completions/cargo-lab.fish
 
     # cargo subcmd setup
-    RUN echo 'source <(cargo playground completions bash)' >> .bashrc
-    RUN cargo playground completions zsh >> .zshrc
-    RUN cargo playground completions fish > .config/fish/completions/cargo.fish
+    RUN echo 'source <(cargo lab completions bash)' >> .bashrc
+    RUN cargo lab completions zsh >> .zshrc
+    RUN cargo lab completions fish > .config/fish/completions/cargo.fish
 
-    SAVE IMAGE cpg_autocomplete:$(cargo playground --version | awk '{print $2}')
+    SAVE IMAGE clb_autocomplete:$(cargo lab --version | awk '{print $2}')
 
 
 # ──────────────────────────────────────────────────────────────────────── #
@@ -222,7 +222,7 @@ lint-readme:
 exe:
     FROM +src
     ARG profile="release"
-    ARG BIN_NAME="cargo-playground"
+    ARG BIN_NAME="cargo-lab"
 
     DO rust+CARGO \
         --args="build --profile=${profile}" \
@@ -230,7 +230,7 @@ exe:
     RUN test -e target/$profile/$BIN_NAME
 
     LET BIN_TARGET="$(rustc --print host-tuple)/${BIN_NAME}-${CRATE_VERSION}-${profile}"
-    SAVE ARTIFACT target/$profile/$BIN_NAME cargo-playground
+    SAVE ARTIFACT target/$profile/$BIN_NAME cargo-lab
     SAVE ARTIFACT \
         target/$profile/$BIN_NAME \
         AS LOCAL \

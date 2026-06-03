@@ -11,7 +11,7 @@ use crate::cli::invocations::InvocationType::{CargoSubcmd, Direct};
 /// Clap's autocomplete scripts dispatch based on arg0 only (and
 /// in general this might be how shell autocompletion works too?)
 /// so we need to need to generate autocompletions for the `cargo`
-/// command itself when being invoked as `cargo playground`.
+/// command itself when being invoked as `cargo lab`.
 ///
 /// # Notes
 ///

@@ -6,7 +6,7 @@ use crate::global_ctx::{GlobalCtx, ProjectPaths};
 use crate::templates::TEMPLATES;
 use crate::{data, global_ctx, util};
 
-/// Initializes a new playground, very very roughly
+/// Initializes a new lab, very very roughly
 /// matching how `cargo init` works.
 ///
 /// We don't actually call `cargo init` for now, just
@@ -25,14 +25,14 @@ use crate::{data, global_ctx, util};
 ///
 /// (We don't _have_ to mirror this behavior bug-for-bug here ...
 /// but actually probably will end up doing so.)
-pub fn init_new_playground(
+pub fn init_new_lab(
     input_path: &Utf8Path,
     name: &str,
     edition: &str,
     ctx: GlobalCtx,
 ) -> crate::Result<()> {
     // TODO: handle (probably w/ just a warning?)
-    //   if `--manifest-path` or `CARGO_PLAYGROUND_MANIFEST_PATH`
+    //   if `--manifest-path` or `CARGO_LAB_MANIFEST_PATH`
     //   were provided (and ignore them otherwise)
 
     // path checks
@@ -40,8 +40,8 @@ pub fn init_new_playground(
         if !input_path.is_dir() {
             return Err(crate::Error::FileErr {
                 path: input_path.to_owned(),
-                description: "provided playground directory exists but is not \
-                              a directory."
+                description: "provided lab directory exists but is not a \
+                              directory."
                     .to_owned(),
             });
         }
@@ -93,8 +93,7 @@ pub fn init_new_playground(
 
     if ctx.verbosity > global_ctx::Quiet {
         cprintln!(
-            "\n<green>success</>: Playground initialized in directory \
-             '<blue>{}</>'",
+            "\n<green>success</>: Lab initialized in directory '<blue>{}</>'",
             paths
                 .manifest_dir
                 .strip_prefix(&ctx.cwd)
@@ -124,7 +123,7 @@ name = "{project_name}"
 edition = "{edition}"
 publish = false
 
-[package.metadata.cargo-playground]
+[package.metadata.cargo-lab]
 enabled = true
 # editor-cmd = ["vim"]
 "#
@@ -132,16 +131,16 @@ enabled = true
 }
 
 fn _usage_tips(manifest_dir_abspath: &str) -> String {
-    let env_var = global_ctx::CARGO_PLAYGROUND_MANIFEST_DIR;
+    let env_var = global_ctx::CARGO_LAB_MANIFEST_DIR;
     cformat!(
         r#"Tips:
- 1) To enable tab-completion, run `<cyan>cargo playground completions --help</>`
- 2) To access this playground from any working directory, set
+ 1) To enable tab-completion, run `<cyan>cargo lab completions --help</>`
+ 2) To access this lab from any working directory, set
     `<cyan>{env_var}={manifest_dir_abspath}</cyan>`
     or use the `--manifest-path` flag
-    (`<cyan>cargo playground --manifest-path={manifest_dir_abspath}</>`).
+    (`<cyan>cargo lab --manifest-path={manifest_dir_abspath}</>`).
  3) To alias the command to something shorter, use a shell alias
-    (e.g., `<cyan>alias cpg="cargo playground"</>`);
+    (e.g., `<cyan>alias cpg="cargo lab"</>`);
     tab-completion won't (for now) work with cargo aliases in config.toml.
     "#
     )

@@ -1,5 +1,5 @@
 // To install dependencies and activate features:
-// `cargo playground inject {scriptname} clap -F clap/derive`
+// `cargo lab inject {scriptname} clap -F clap/derive`
 
 use clap::{Parser, Subcommand};
 

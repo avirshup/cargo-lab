@@ -5,8 +5,8 @@ use clap::CommandFactory;
 
 use crate::cli;
 
-pub(super) const SUBCMD_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_SUBCMD";
-pub(super) const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_DIRECT";
+pub(super) const SUBCMD_COMPLETE_VAR: &str = "COMPLETE_CARGO_LAB_SUBCMD";
+pub(super) const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_LAB_DIRECT";
 
 /// Was this invoked with an argv of `["cargo-$X", "$X", ..args]`
 /// or directly (with this exe as arg0?)
@@ -17,7 +17,7 @@ pub(super) const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_PG_DIRECT";
 /// This does NOT detect usage as an xtask - xtasks
 /// are just aliases for `cargo run`, and `cargo run` will
 /// calls the executable directly (i.e., actually invoked executable
-/// will be something like "./target/debug/cargo-playground")
+/// will be something like "./target/debug/cargo-lab")
 #[derive(Debug)]
 pub(super) enum InvocationType {
     CargoSubcmd {

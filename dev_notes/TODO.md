@@ -10,17 +10,19 @@
 ### Bugs
 
 - [x] BUG: passing arguments to scripts via doesn't work
-      (`cargo playground run $scriptname -- $args` should work)
+      (`cargo lab run $scriptname -- $args` should work)
 
 - autocomplete:
   - [x] BUG: "global" arguments are suggested w/ base "cargo" cmd, that ain't
         right
-    - WHY? because `cargo playground generate` generates completions for bare
+    - WHY? because `cargo lab completions` generates completions for bare
       `cargo` itself I guess?
-  - [x] `cargo play[tab]` does not autocomplete even though
-        `cargo playground [args] [tab]` does
-  - [ ] It should work with cargo aliases (if u set `[alias] pg = "playground"`
-        then `cargo pg [tab]` should still work)
+  - [x] `cargo la[tab]` does not autocomplete even though
+        `cargo lab [args] [tab]` does
+  - ~~[ ] It should work with cargo aliases? (if u set `[alias] lb = "lab"` then
+    `cargo lab [tab]` should still work)~~
+    - Now that we are renamed to `cargo-lab`, which is much easier to type, this
+      is not really a big deal anymore
     - This _used to_ work! I tested it! Why doesn't it work anymore?
     - Oh - it's because we now check to ensure that we're really running the
       correct cargo subcmd before generating completions ... but that doesn't
@@ -30,10 +32,10 @@
         set, check output of `cargo --list`. Unfortunately the latter is not
         _really_ designed to be machine-readable and there may be escaping
         problems. The latter will definitely be pretty slow unfortunately.
-      - Or, hell, put "cargo-alias-playground" into our metadata? Although then
-        we have to read cargo.toml every single time there's a cargo
-        autocomplete request we don't recognize (although could hardcode a list
-        of commands we don't respond to)
+      - Or, hell, put "cargo-alias-lab" into our metadata? Although then we have
+        to read cargo.toml every single time there's a cargo autocomplete
+        request we don't recognize (although could hardcode a list of commands
+        we don't respond to)
         - not that reading one file every time is a particularly big deal
       - Fix when stable: can run
         `cargo +nightly -Z unstable-options config get alias.$subcmd`
@@ -45,15 +47,14 @@
       - wishful thinking: cargo gets features to allow more cooperativity w.r.t.
         autocomplete for plugins (maybe when they stabilize the dynamic
         autocomplete some day?)
-  - [ ] in `bash` (and `zsh`) `source <(cargo playground completions bash)`
-        overrides the effect of `source <(rustup completions bash cargo)`, and
-        vice versa.
+  - [ ] in `bash` (and `zsh`) `source <(cargo lab completions bash)` overrides
+        the effect of `source <(rustup completions bash cargo)`, and vice versa.
 
-- [ ] `cargo playground [args] &| cat` should not contain ANSI color by default
+- [ ] `cargo lab [args] &| cat` should not contain ANSI color by default
       (because output not a TTY)
-  - [x] `cargo playground &| cat`, `cargo playground help &| cat` (clap
-        automatically determines whether to use color)
-  - [ ] `cargo playground list &| cat` (and all other subccommands really)
+  - [x] `cargo lab &| cat`, `cargo lab help &| cat` (clap automatically
+        determines whether to use color)
+  - [ ] `cargo lab list &| cat` (and all other subccommands really)
     - related but not relevant:
       [see the TIL here](https://stackoverflow.com/a/79614957/1958900).
 
@@ -88,7 +89,7 @@
     - [ ] vscode: todo
 - [x] Cargo.toml discovery
   - [x] configurable **Cargo.toml location** via env var or CLI, so you can use
-        it from anywhere (`CARGO_PLAYGROUND_MANIFEST_PATH`)
+        it from anywhere (`CARGO_LAB_MANIFEST_PATH`)
 - [x] "Naming support"
   - [x] name generator: done (lifted naming scheme directly from docker).
   - [x] ~~`cpg new`: generate a name when creating a project if not specified?~~
@@ -110,12 +111,11 @@
 
 ## Misc task
 
-- [ ] passing arguments to script via `cargo playground run $scriptname $args`
-      should work _even if_ `$args` contains flags. i.e., user can omit "--" and
-      everything after `scriptname` will be treated as arguments to the
-      playground (same way as `docker run` works)
-  - [x] working when there are no conflicts with `cargo playground` options.
-        Fixed by:
+- [ ] passing arguments to script via `cargo lab run $scriptname $args` should
+      work _even if_ `$args` contains flags. i.e., user can omit "--" and
+      everything after `scriptname` will be treated as arguments to the lab
+      (same way as `docker run` works)
+  - [x] working when there are no conflicts with `cargo lab` options. Fixed by:
     ```
     #[arg(allow_hyphen_values = true, num_args = 0..)]
     pub args: Vec<String>
@@ -189,16 +189,16 @@
   - `winnow` is maintained by a maintainer of cargo itself so it's still high
     trust (also it's a fork of `nom` apparently?)
 
-## usage as `cargo playground`
+## usage as `cargo lab`
 
-- [x] require enabling "metadata.playground" flag in Cargo.toml before modifying
-      it so you don't accidentally a non-playground.
+- [x] require enabling "package.metadata.cargo-lab" flag in Cargo.toml before
+      modifying it so you don't accidentally a non-lab.
 - [x] local template dir creation / management
 
 ## usage as `xtask`
 
 - [x] configurable location for the main project (implemented: use
-      `CARGO_PLAYGROUND_MANIFEST_PATH` or `--manifest-path`)
+      `CARGO_LAB_MANIFEST_PATH` or `--manifest-path`)
 - [ ] get autocomplete working w/ `cargo xtask`?
   - somehow screen it so that it only invokes our autocomplete for "cargo xtask"
     when running in the correct workspace? In the shell script, filters on the
@@ -243,12 +243,12 @@
 - [ ] use cargo's styles from `cli_style` for output everywhere
 - [ ] parse module-level docstrings from scripts so that you can display /
       search through them on the CLI?
-- [x] `cargo playground init` - to create a whole-ass new project or enable
-      metadata on existing one
+- [x] `cargo lab init` - to create a whole-ass new project or enable metadata on
+      existing one
   - [x] ~~optionally initialize as xtask? (i.e., add this code to the
         workspace?)~~ nah
-- [x] `cargo playground rename`
-- [ ] `cargo playground copy`
+- [x] `cargo lab rename`
+- [ ] `cargo lab copy`
 - [ ] `cpg template`: list (modify/create?) available **templates**, + tell user
       where stored, how to modify
 - [ ] **Version conflicts**: what happens if `cpg new script1 dep@0.1.2` then

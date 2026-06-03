@@ -9,7 +9,7 @@ use crate::manifest_data::{BinTable, ManifestData};
 pub fn check_project(ctx: GlobalCtx) -> crate::Result<()> {
     // ───── Basic project config ───────────────────────────────────── //
     // we can't check much if any of these fail
-    cprintln!("Checking cargo playground configuration ...");
+    cprintln!("Checking cargo lab configuration ...");
 
     // Cargo.toml discovery
     let path_result = ctx.project_paths();
@@ -33,18 +33,15 @@ pub fn check_project(ctx: GlobalCtx) -> crate::Result<()> {
     // we don't have to stop after the first error anymore
     let mut errs = Vec::new();
 
-    // [package.metadata.cargo-playground]
-    let playground_cfg_result =
-        ctx.playground_config().as_ref().ok_or_else(|| {
-            crate::Error::NoConfig(
-                "package.metadata.cargo-playground".to_owned(),
-            )
-        });
+    // [package.metadata.cargo-lab]
+    let lab_cfg_result = ctx.lab_config().as_ref().ok_or_else(|| {
+        crate::Error::NoConfig("package.metadata.cargo-lab".to_owned())
+    });
     _print_check_result(
-        "Cargo.toml::[package.metadata.cargo-playground]",
+        "Cargo.toml::[package.metadata.cargo-lab]",
         path_result.map(|_| "valid").map_err(|_| "not found"),
     );
-    if let Err(e) = playground_cfg_result {
+    if let Err(e) = lab_cfg_result {
         errs.push(e);
     }
 

@@ -33,13 +33,8 @@ pub struct ManifestData {
 }
 
 impl ManifestData {
-    pub fn playground_config(&self) -> Option<&PlaygroundConfig> {
-        self.package
-            .as_ref()?
-            .metadata
-            .as_ref()?
-            .cargo_playground
-            .as_ref()
+    pub fn lab_config(&self) -> Option<&LabConfig> {
+        self.package.as_ref()?.metadata.as_ref()?.cargo_lab.as_ref()
     }
 
     /// Returns true if cargo.toml already has this dependency and a version that's
@@ -175,12 +170,12 @@ impl FromStr for DependencyTable {
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct PackageMetadata {
-    pub cargo_playground: Option<PlaygroundConfig>,
+    pub cargo_lab: Option<LabConfig>,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
-pub struct PlaygroundConfig {
+pub struct LabConfig {
     #[serde(default = "_false")]
     pub enabled: bool,
 
@@ -222,7 +217,7 @@ version = "0.3.0-dev4"
 optional = true
 features = ["oh-no"]
 
-[package.metadata.cargo-playground]
+[package.metadata.cargo-lab]
 enabled = true
 editor-cmd = ["delphi", "-p"]  # not really
 
@@ -297,7 +292,7 @@ edition = "252525"
             package: Some(PackageTable {
                 name: Some(_s("packagename")),
                 metadata: Some(PackageMetadata {
-                    cargo_playground: Some(PlaygroundConfig {
+                    cargo_lab: Some(LabConfig {
                         enabled: true,
                         editor_cmd: Some(vec![_s("delphi"), _s("-p")]),
                         experimental_rfc_3502_scripts: false,

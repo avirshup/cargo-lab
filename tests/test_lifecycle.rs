@@ -11,7 +11,7 @@
 pub mod common;
 use common::*;
 
-/// Exercise the playground and script lifecycles.
+/// Exercise the lab and script lifecycles.
 ///
 /// This is an e2e test that should every subcommand
 /// at least once:
@@ -32,7 +32,7 @@ use common::*;
 ///
 /// By default, this test invokes our executable from a tempdir, via
 /// something along the lines of
-/// `cargo run --manifest-path=$thisdir --bin=cargo-playground -- [..args]`
+/// `cargo run --manifest-path=$thisdir --bin=cargo-lab -- [..args]`
 ///
 /// TODO: Test it (probably in containers) when installed:
 ///     1. as a cargo subcommand
@@ -46,7 +46,7 @@ use common::*;
 ///       and/or the env var
 #[test]
 #[ignore]
-fn test_playground_lifecycle() {
+fn test_lab_lifecycle() {
     // TODO: this runs our commands via `cargo run --bin cargo-playgronud -- [args]`.
     //   Should be testing this _as installed_ in both direct and subcmd mode.
     let tempdir = ScratchDir::new();
@@ -54,7 +54,7 @@ fn test_playground_lifecycle() {
 
     // ───── 1. Newly initialized project ───────────────────────────── //
     // ───── Project creation ─────
-    runner.run_cpg(&["init", PROJECT_NAME]).expect_ok();
+    runner.run_lab(&["init", PROJECT_NAME]).expect_ok();
 
     runner.cd(PROJECT_NAME);
 
@@ -68,32 +68,32 @@ fn test_playground_lifecycle() {
 
     // ───── Commands in newly-created state ─────
     runner
-        .run_cpg(&["list", "-q"])
+        .run_lab(&["list", "-q"])
         .expect_ok()
         .expect_stdout(INIT_SCRIPT);
 
-    runner.run_cpg(&["run", INIT_SCRIPT]).expect_ok();
+    runner.run_lab(&["run", INIT_SCRIPT]).expect_ok();
 
     // try to create an existing script
-    runner.run_cpg(&["new", INIT_SCRIPT]).expect_fail();
+    runner.run_lab(&["new", INIT_SCRIPT]).expect_fail();
 
     // ───── 2. Adding scripts ─────────────────────────────────────── //
     // ───── 2a. SCRIPT2: set name, no dependencies ─────
     // bare script
     let expect_script2_path = projpath("src", SECOND_SCRIPT, "rs");
     runner
-        .run_cpg(&["new", SECOND_SCRIPT, "--template=basic"])
+        .run_lab(&["new", SECOND_SCRIPT, "--template=basic"])
         .expect_ok();
     runner.expect_file(&expect_script2_path);
-    runner.run_cpg(&["run", SECOND_SCRIPT]).expect_ok();
+    runner.run_lab(&["run", SECOND_SCRIPT]).expect_ok();
     runner
-        .run_cpg(&["info", SECOND_SCRIPT])
+        .run_lab(&["info", SECOND_SCRIPT])
         .expect_ok()
         .expect_stdout_contains(&expect_script2_path);
 
     // ───── 2b. TRY_CLAP_SCRIPT: Automatically named, w/ dependencies ─────
     runner
-        .run_cpg(&[
+        .run_lab(&[
             "quick",
             "clap",
             "--features",
@@ -107,10 +107,10 @@ fn test_playground_lifecycle() {
         .expect_stdout_contains(&projpath("src", TRY_CLAP_SCRIPT, "rs"));
 
     // TODO: don't require the '--' arg, like how `docker run [imagename]` works:
-    //   any `cpg run` flag must come before the script name, and any arguments
+    //   any `cargo lab run` flag must come before the script name, and any arguments
     //   after the script name are passed to the script
     runner
-        .run_cpg(&[
+        .run_lab(&[
             "run",
             TRY_CLAP_SCRIPT,
             "--",
@@ -127,38 +127,38 @@ fn test_playground_lifecycle() {
     let expect_rename_path = projpath("src", CLAP_RENAME, "rs");
 
     runner
-        .run_cpg(&["rename", TRY_CLAP_SCRIPT, CLAP_RENAME])
+        .run_lab(&["rename", TRY_CLAP_SCRIPT, CLAP_RENAME])
         .expect_ok();
     runner.expect_file(&expect_rename_path);
 
     // test that query functions return it (and not the old one)
-    runner.run_cpg(&["info", TRY_CLAP_SCRIPT]).expect_fail();
+    runner.run_lab(&["info", TRY_CLAP_SCRIPT]).expect_fail();
     runner
-        .run_cpg(&["info", CLAP_RENAME])
+        .run_lab(&["info", CLAP_RENAME])
         .expect_ok()
         .expect_stdout_contains(&expect_rename_path)
         .expect_stdout_contains("\"clap\"")
         .expect_stdout_contains("\"clap/derive\"");
 
     runner
-        .run_cpg(&["list", "-q"])
+        .run_lab(&["list", "-q"])
         .expect_ok()
         .expect_stdout_contains(CLAP_RENAME);
 
     // ───── 3b. adding new dependencies ─────
     // dependency + implicit-dependency feature
     runner
-        .run_cpg(&["inject", CLAP_RENAME, "anyhow", "-F", "backtrace"])
+        .run_lab(&["inject", CLAP_RENAME, "anyhow", "-F", "backtrace"])
         .expect_ok();
 
     // explicit-dependency features
     runner
-        .run_cpg(&["inject", CLAP_RENAME, "--features=clap/color"])
+        .run_lab(&["inject", CLAP_RENAME, "--features=clap/color"])
         .expect_ok();
 
     // check that they are all at least listed in the output
     runner
-        .run_cpg(&["info", CLAP_RENAME])
+        .run_lab(&["info", CLAP_RENAME])
         .expect_ok()
         .expect_stdout_contains("\"clap\"")
         .expect_stdout_contains("\"clap/derive\"")

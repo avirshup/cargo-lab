@@ -1,18 +1,17 @@
-# `cargo-playground`
+# `cargo-lab`
 
-[![Crates.io](https://img.shields.io/crates/v/cargo-playground?style=flat-square)](https://crates.io/crates/cargo-playground)
+[![Crates.io](https://img.shields.io/crates/v/cargo-lab?style=flat-square)](https://crates.io/crates/cargo-lab)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-A cargo plugin for quick, disposable, local, and IDE-friendly Rust "playground"
-scripts with arbitrary dependencies, and should work on all standard rust
-targets.
+A cargo plugin for managing quick, disposable, local, and IDE-friendly Rust
+experiments with arbitrary dependencies.
 
 ## Contents
 
 <!-- prettier-ignore-start -->
 
 <!-- TOC -->
-* [`cargo-playground`](#cargo-playground)
+* [`cargo-lab`](#cargo-lab)
   * [Contents](#contents)
   * [What is this for?](#what-is-this-for)
     * [<a id="hygiene"><sup>†</sup></a>WARNING: This is not a sandbox.](#a-idhygienesupsupawarning-this-is-not-a-sandbox)
@@ -20,8 +19,8 @@ targets.
   * [The basic idea](#the-basic-idea)
   * [Useful commands](#useful-commands)
     * [Installation and setup](#installation-and-setup)
-    * [Creating playgrounds projects](#creating-playgrounds-projects)
-    * [Creating scripts in playgrounds](#creating-scripts-in-playgrounds)
+    * [Creating labs projects](#creating-labs-projects)
+    * [Creating scripts in labs](#creating-scripts-in-labs)
     * [Working with scripts](#working-with-scripts)
     * [Example](#example)
   * [Configuration](#configuration)
@@ -36,9 +35,9 @@ targets.
 
 ## What is this for?
 
-Like the official [Rust Playground](https://play.rust-lang.org/),
-`cargo-playground`'s goal is to make it possible to create and experiment with
-some rust code with as little setup as possible.
+Like the [Rust Playground](https://play.rust-lang.org/), `cargo-lab`'s goal is
+to make it possible to create and experiment with some rust code with as little
+setup as possible.
 
 _Unlike_ the online Rust Playground, this aims to do all this:
 
@@ -46,7 +45,9 @@ _Unlike_ the online Rust Playground, this aims to do all this:
 2. with _your_ IDE's normal features (autocomplete, typechecking, linting,
    etc.), and
 3. with any set of dependencies<a href="#hygiene"><sup>†</sup></a> and features
-   that you care to try.
+   that you care to try,
+4. with a persistent collection of all your experiments that you can refer back
+   to.
 
 ### <a id="hygiene"><sup>†</sup></a>WARNING: This is not a sandbox.
 
@@ -54,9 +55,9 @@ Don't run untrusted code or dependencies without protection.
 
 <!-- TODO: add more plausibly deniable euphemisms -->
 
-A `cargo playground`-managed "playground" is just a local cargo project; the
-same security principles apply. Running a malicious playground script or
-dependency - or even just _building_ a malicious dependency - is
+A `cargo lab`-managed "lab" is just a local cargo project; the same security
+principles apply. Running a malicious lab script or dependency - or even just
+_building_ a malicious dependency - is
 [exactly](https://github.com/rust-lang/cargo/security/advisories/GHSA-rfj2-q3h3-hm5j)
 [as](https://github.com/rust-lang/cargo/security/advisories/GHSA-jq42-7mfv-hm57)
 [dangerous](https://blog.rust-lang.org/2025/09/24/crates.io-malicious-crates-fasterlog-and-asyncprintln/)
@@ -65,48 +66,48 @@ here as it would be in any other cargo project.
 ## Quick start
 
 This program is designed to run as a cargo subcommand, and can be installed via
-`cargo install cargo-playground`. (To setup tab-completion in your shell, see
-`cargo playground completions --help`).
+`cargo install cargo-lab`. (To setup tab-completion in your shell, see
+`cargo lab completions --help`).
 
-You can then set up a new "playground" project:
+You can then set up a new "lab" project:
 
 ```bash
-# create or initialize a playground project
-mkdir new-playground
-cargo playground init ./new-playground
+# create or initialize a lab project
+mkdir new-lab
+cargo lab init ./new-lab
 
 # Create a new script at "src/my_script.rs"
-cargo playground new my-script dep1 -F dep/feature
+cargo lab new my-script dep1 -F dep/feature
 
 # Add dependencies and activate features for a script
-cargo playground inject script-name dep1 dep2 -F dep1/featurename -F dep2/featurename
+cargo lab inject script-name dep1 dep2 -F dep1/featurename -F dep2/featurename
 
 # Run a script
-cargo playground run script-name
+cargo lab run script-name
 ```
 
 ## The basic idea
 
-A "playground" here means a cargo project with lots of one-off scripts in it,
-all with their own arbitrary dependencies. You can initialize one by running
-`cargo playground init $path`.
+A "lab" here means a cargo project with lots of one-off scripts in it, all with
+their own arbitrary dependencies. You can initialize one by running
+`cargo lab init $path`.
 
 ```console-session
-$ cargo playground init ./my-new-playground
+$ cargo lab init ./my-new-lab
 Initializing project directory ...
 Creating first script ...
 success: Created minimal script at: src/my_first_script.rs
 
-success: Playground initialized in directory 'my-new-playground'
+success: Lab initialized in directory 'my-new-lab'
 
 Tips:
- 1) To enable tab-completion, see `cargo playground completions --help`
- 2) To access this playground from any working directory, set
-    `CARGO_PLAYGROUND_MANIFEST_DIR=/path/to/my-new-playground`
+ 1) To enable tab-completion, see `cargo lab completions --help`
+ 2) To access this lab from any working directory, set
+    `CARGO_LAB_MANIFEST_DIR=/path/to/my-new-lab`
     or use the `--manifest-path` flag
-    (`cargo playground --manifest-path=/path/to/my-new-playground`).
+    (`cargo lab --manifest-path=/path/to/my-new-lab`).
  3) To alias the command to something shorter, use a shell alias
-    (e.g., `alias cpg="cargo playground"`);
+    (e.g., `alias cpg="cargo lab"`);
     tab-completion won't (for now) work with cargo aliases in config.toml.
 
 ```
@@ -115,12 +116,12 @@ This will create a completely normal cargo project that the IDE of your choice
 will happily work with:
 
 ```console-session
-$ cd my-new-playground
+$ cd my-new-lab
 $ tree .
 ./
 ├── Cargo.toml
 ├── src
-│   └── new_playground.rs
+│   └── new_lab.rs
 └── templates
     ├── bare.rs.template
     ├── basic.rs.template
@@ -128,8 +129,7 @@ $ tree .
     └── clap_subcmd.rs.template
 ```
 
-Each script managed by `cargo-playground` will have an entry like this in
-`Cargo.toml`:
+Each script managed by `cargo-lab` will have an entry like this in `Cargo.toml`:
 
 ```toml
 [[bin]]
@@ -139,37 +139,36 @@ required-features = ["dep1", "dep2", "dep3/feature"]
 ```
 
 Note that you can (and should) edit the generated Cargo.toml if you want, and
-cargo playground should continue to work normally. If you're having problems,
-try running `cargo check` and `cargo playground check` to detect config issues.
+cargo lab should continue to work normally. If you're having problems, try
+running `cargo check` and `cargo lab check` to detect config issues.
 
 ## Useful commands
 
 ### Installation and setup
 
-- `cargo install --locked cargo-playground` will build and install the latest
-  stable version from crates.io and make the `cargo playground` subcommand
-  available.
+- `cargo install --locked cargo-lab` will build and install the latest stable
+  version from crates.io and make the `cargo lab` subcommand available.
 
-### Creating playgrounds projects
+### Creating labs projects
 
-- `cargo playground init` - creates a new playground project
+- `cargo lab init` - creates a new lab project
 
-### Creating scripts in playgrounds
+### Creating scripts in labs
 
-- `cargo playground quick [deps] [-F features]`: create new script with
-  autogenerated name
-- `cargo playground new (SCRIPT) [deps] [-F features]`: create new script with a
-  chosen name
+- `cargo lab quick [deps] [-F features]`: create new script with autogenerated
+  name
+- `cargo lab new (SCRIPT) [deps] [-F features]`: create new script with a chosen
+  name
 
 ### Working with scripts
 
-- `cargo playground run (SCRIPT) [args ...]`: run a script (unlike
-  `cargo run --bin`, this automatically activates all required features)
-- `cargo playground edit (SCRIPT)`: open the script in your editor (requires
-  that the `editor-cmd` field to be set in `Cargo.toml`)
-- `cargo playground inject (SCRIPT) [deps] [-F features]` - add dependencies and
+- `cargo lab run (SCRIPT) [args ...]`: run a script (unlike `cargo run --bin`,
+  this automatically activates all required features)
+- `cargo lab edit (SCRIPT)`: open the script in your editor (requires that the
+  `editor-cmd` field to be set in `Cargo.toml`)
+- `cargo lab inject (SCRIPT) [deps] [-F features]` - add dependencies and
   activate features for an existing script
-- `cargo playground rename (SCRIPT) (NEW_NAME)` - rename a script
+- `cargo lab rename (SCRIPT) (NEW_NAME)` - rename a script
 
 (Note that if autocompletion has been enabled, all subcommands, flags, and
 script names can be tab-completed.)
@@ -180,7 +179,7 @@ Let's say I want to play around with the `proc-macro2` crate. First I'll create
 a new script and ask for it to be opened in my IDE immediately.
 
 ```console session
-$ cargo playground quick proc-macro2 --edit
+$ cargo lab quick proc-macro2 --edit
 Generated script name: try-proc-macro2
 running:
 $ cargo add --optional proc-macro2
@@ -205,7 +204,7 @@ Updated Cargo.toml:
 And then add the dependencies and features we want to use:
 
 ```console session
-$ cargo playground inject proc-macro-experiment syn quote proc-macro2 --feature syn/parsing
+$ cargo lab inject proc-macro-experiment syn quote proc-macro2 --feature syn/parsing
 running: "$ cargo add --optional syn quote proc-macro2"
     Updating crates.io index
       [...]
@@ -221,7 +220,7 @@ Then, you can play with it in the IDE of your choice and run it:
 ```console session
 $ rustrover .  # start my IDE
 $ # ... make changes ...
-$ cargo playground run proc-macro-experiment
+$ cargo lab run proc-macro-experiment
 my experiment's output goes here
 ```
 
@@ -230,24 +229,23 @@ my experiment's output goes here
 ### Shell autocomplete
 
 Instructions for setting up tab completions for various shells can displayed by
-running `cargo playground completions --help`. Fish, Bash, and ZSH are all
-supported; other shells supported by `clap` _may_ work but have not been tested.
+running `cargo lab completions --help`. Fish, Bash, and ZSH are all supported;
+other shells supported by `clap` _may_ work but have not been tested.
 
 If you experience issues with tab completions, they may be due to conflicts with
 other cargo plugins or even cargo itself. One workaround is to call the
-executable directly (spelled "`cargo-playground`" with a hyphen, one word)
-instead of through cargo ("`cargo playground`" with a space in the middle, two
-words).
+executable directly (spelled "`cargo-lab`" with a hyphen, one word) instead of
+through cargo ("`cargo lab`" with a space in the middle, two words).
 
 ### In `Cargo.toml`
 
-`cargo playground` stores configuration playground's `Cargo.toml` in the
-`[package.metadata.cargo-playground]` table. Note that this tool won't make any
+`cargo lab` stores configuration lab's `Cargo.toml` in the
+`[package.metadata.cargo-lab]` table. Note that this tool won't make any
 modifications to your project unless this table is present.
 
 ```toml
-[package.metadata.cargo-playground]
-# cargo-playground won't make changes to any project unless
+[package.metadata.cargo-lab]
+# cargo-lab won't make changes to any project unless
 #    unless this field exists and is set to "true":
 enabled = true
 
@@ -276,16 +274,27 @@ editor-cmd = ["rustrover"]
   autocompletion, or even just work offline?
   - There is also [Rust explorer](https://www.rustexplorer.com), also web based
     but supports the top _10k dependencies_, not just top 100.
-  - [There is (was?) funding to improve web-based rust "playground" ecosystem](https://users.rust-lang.org/t/call-for-contributors-to-the-rust-playground-for-upcoming-features/87110?u=epage),
+  - [There is (was?) funding to improve web-based rust "lab" ecosystem](https://users.rust-lang.org/t/call-for-contributors-to-the-rust-lab-for-upcoming-features/87110?u=epage),
     which is great.
 - single file
   [cargo scripts](https://rust-lang.github.io/rfcs/3502-cargo-script.html) are
   also a great idea, but don't yet have IDE support.
 - [ `evcxr`](https://github.com/evcxr/evcxr) is an insanely impressive REPL for
-  rust (which _should not be even possible_)
+  rust (which _should not be even possible_, but it actually works)
 - A normal crate with lots of `[[bin]]` entries also works ok - this project
-  used to be my personal playground repository, which then evolved an `xtask` to
-  help manage the dependencies, which then turned into this standalone tool.
+  used to be my personal lab repository, which then evolved an `xtask` to help
+  manage the dependencies, which then turned into this standalone tool.
+
+There are also crates with very similar names to this one:
+
+- [fanzeyi/cargo-play](https://github.com/fanzeyi/cargo-play/), last updated
+  in 2022. support for single-file rust scripts, much like `cargo script` and
+  RFC 3502.
+- [Lutetium-Vanadium/cargo-lab](https://github.com/Lutetium-Vanadium/cargo-lab),
+  last updated in 2021. Seems very similar to this project, and unfortunately
+  has the same name. Not on crates.io - apparently there was _yet another_
+  project (not mine!) with the same name on crates.io at the time, but it
+  apparently got removed sometime between then and mid-2026.
 
 ## Provenance
 

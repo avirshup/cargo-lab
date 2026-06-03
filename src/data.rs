@@ -52,7 +52,7 @@ pub struct FeatureRequest {
 // in `manifest_data.rs`. Probably should make it harder to accidentally
 // use the manifest data directly when you really want to use these instead.
 
-/// A playground script (aka a `[[bin]]` table) in Cargo.toml.
+/// A lab script (aka a `[[bin]]` table) in Cargo.toml.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScriptEntry {
     pub name: String,
@@ -60,7 +60,7 @@ pub struct ScriptEntry {
     pub required_features: Vec<String>,
 }
 
-/// A template from the playground's templates directory
+/// A template from the lab's templates directory
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScriptTemplate {
     pub name: String,

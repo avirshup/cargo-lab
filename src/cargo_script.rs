@@ -18,7 +18,7 @@
 //! When/if scripts are fully stabilized and supported, instead of maintaining
 //! the cargo-script metadata in the source file all the time (which also
 //! has issues around keeping it in sync with cargo.toml), maybe we want
-//! a command like `cargo playground eject-script $scriptname -o dest`
+//! a command like `cargo lab eject-script $scriptname -o dest`
 //! that takes an existing script (without metadata) and writes it out as
 //! a standalone single-file script w/ the relevant metadata.
 //!

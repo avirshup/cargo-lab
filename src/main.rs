@@ -67,7 +67,7 @@ fn run(args: cli::MainCli) -> Result<()> {
 
     let ctx = GlobalCtx::new(verbosity, args.global_args.manifest_path.clone());
     match args.cmd {
-        cli::SubCmd::InitPlayground(cli::InitPlayground {
+        cli::SubCmd::InitLab(cli::InitLab {
             path,
             name: input_name,
             edition,
@@ -76,7 +76,7 @@ fn run(args: cli::MainCli) -> Result<()> {
                 path.file_name().expect("non-empty filename").into()
             });
 
-            ops::init_new_playground(&path, &name, &edition, ctx)?;
+            ops::init_new_lab(&path, &name, &edition, ctx)?;
         },
 
         cli::SubCmd::RunScript(cli::RunScript { script_name, args }) => {

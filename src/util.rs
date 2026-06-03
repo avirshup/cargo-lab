@@ -71,9 +71,9 @@ pub fn join_str_iter<'a, 'b>(
 
 /// `cmd_suffix("/path/to/cargo-thing.exe")` produces `Some("thing")`
 ///
-/// Q: what if it's called "cargo-playground.old.exe" huh? what then hotshot?
+/// Q: what if it's called "cargo-lab.old.exe" huh? what then hotshot?
 /// A: In this case, cargo won't run it as a subocmmand
-/// (`cargo playground.old` doesn't work), so we don't have to handle
+/// (`cargo lab.old` doesn't work), so we don't have to handle
 /// this case.
 pub fn cargo_cmd_suffix(exe_path: &Utf8Path) -> Option<&str> {
     exe_path
