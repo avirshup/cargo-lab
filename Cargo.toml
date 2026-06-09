@@ -1,5 +1,5 @@
 [package]
-name = "cargo-playground"
+name = "cargo-lab"
 version = "0.0.0-unset"
 edition = "2024"
 
