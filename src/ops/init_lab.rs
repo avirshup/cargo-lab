@@ -55,7 +55,7 @@ pub fn init_new_lab(
         }
     }
 
-    // TODO: This could be made somewhat more atomic by assembling all of
+    // MAYBE: This could be made somewhat more atomic by assembling all of
     //   this in a temporary directory (under the same parent, probably)
     //   then moving it into place upon success
 
@@ -85,7 +85,7 @@ pub fn init_new_lab(
         println!("Creating first script ...");
     }
     new_script::new_script(
-        &data::ScriptConfigRequest::nodeps("my-first-script".to_owned()),
+        &data::ScriptConfigRequest::nodeps("my-first-experiment".to_owned()),
         None,
         false,
         ctx.with_paths(paths.clone()),
@@ -135,13 +135,13 @@ fn _usage_tips(manifest_dir_abspath: &str) -> String {
     cformat!(
         r#"Tips:
  1) To enable tab-completion, run `<cyan>cargo lab completions --help</>`
- 2) To access this lab from any working directory, set
+ 2) To easily run experiments from any working directory, set
     `<cyan>{env_var}={manifest_dir_abspath}</cyan>`
     or use the `--manifest-path` flag
     (`<cyan>cargo lab --manifest-path={manifest_dir_abspath}</>`).
- 3) To alias the command to something shorter, use a shell alias
-    (e.g., `<cyan>alias cpg="cargo lab"</>`);
-    tab-completion won't (for now) work with cargo aliases in config.toml.
+ 3) To alias this command to something shorter, prefer a shell alias
+    (e.g., `alias clb="cargo lab"`) over a cargo alias (in `.cargo/config.toml`),
+    as tab-completion does not currently support cargo aliases.
     "#
     )
 }

@@ -35,19 +35,19 @@ experiments with arbitrary dependencies.
 
 ## What is this for?
 
-Like the [Rust Playground](https://play.rust-lang.org/), `cargo-lab`'s goal is
-to make it possible to create and experiment with some rust code with as little
-setup as possible.
+`cargo-lab` is a tool for setting up, running, and managing collections of
+one-off experiments in rust.
 
-_Unlike_ the online Rust Playground, this aims to do all this:
+Like the [Rust Playground](https://play.rust-lang.org/), this tool aims to make
+it as fast and painless as possible to run some rust code. However, `cargo-lab`
+makes some different choices - it lets you experiment:
 
-1. on _your_ machine,
-2. with _your_ IDE's normal features (autocomplete, typechecking, linting,
-   etc.), and
-3. with any set of dependencies<a href="#hygiene"><sup>†</sup></a> and features
-   that you care to try,
-4. with a persistent collection of all your experiments that you can refer back
-   to.
+1. on _your_ machine;
+2. with _your_ normal dev tooling (including your IDE's autocomplete,
+   typechecking, linting, ...);
+3. with arbitrary dependencies<a href="#hygiene"><sup>†</sup></a> and features;
+4. in a completely standard, tooling-friendly cargo project;
+5. with a persistent collection of all your experiments.
 
 ### <a id="hygiene"><sup>†</sup></a>WARNING: This is not a sandbox.
 
@@ -76,151 +76,170 @@ You can then set up a new "lab" project:
 mkdir new-lab
 cargo lab init ./new-lab
 
-# Create a new script at "src/my_script.rs"
-cargo lab new my-script dep1 -F dep/feature
+# Creates a new script, setting up the file and adding it to Cargo.toml
+cargo lab new my-script-name dep1 -F dep1/feature
 
 # Add dependencies and activate features for a script
-cargo lab inject script-name dep1 dep2 -F dep1/featurename -F dep2/featurename
+cargo lab inject my-script-name dep1 dep2 -F dep1/featurename -F dep2/featurename
 
-# Run a script
-cargo lab run script-name
+# Run a script (with all dependencies automatically activated)
+cargo lab run my-script-name
 ```
 
 ## The basic idea
 
-A "lab" here means a cargo project with lots of one-off scripts in it, all with
-their own arbitrary dependencies. You can initialize one by running
-`cargo lab init $path`.
+A "cargo laboratory" is cargo project with lots of one-off experiments (we'll
+call these "scripts"), all with their own arbitrary dependencies. You can create
+a new laboratory project by running `cargo lab init $path` where `$path` is an
+empty or new directory.
 
 ```console-session
-$ cargo lab init ./my-new-lab
-Initializing project directory ...
-Creating first script ...
-success: Created minimal script at: src/my_first_script.rs
+$ cargo lab init ./labdir
+  Initializing project directory ...
+  Creating first script ...
+  success: Created minimal script at: src/my_first_experiment.rs
 
-success: Lab initialized in directory 'my-new-lab'
+  success: Lab initialized in directory '/path/to/labdir'
 
-Tips:
- 1) To enable tab-completion, see `cargo lab completions --help`
- 2) To access this lab from any working directory, set
-    `CARGO_LAB_MANIFEST_DIR=/path/to/my-new-lab`
-    or use the `--manifest-path` flag
-    (`cargo lab --manifest-path=/path/to/my-new-lab`).
- 3) To alias the command to something shorter, use a shell alias
-    (e.g., `alias cpg="cargo lab"`);
-    tab-completion won't (for now) work with cargo aliases in config.toml.
-
+  Tips:
+   1) To enable tab-completion, see `cargo lab completions --help`
+   2) To easily run experiments from any working directory, set
+      `CARGO_LAB_MANIFEST_DIR=/path/to/labdir`
+      or use the `--manifest-path` flag
+      (`cargo lab --manifest-path=/path/to/labdir`).
+   3) To alias this command to something shorter, prefer a shell alias
+      (e.g., `alias clb="cargo lab"`) over a cargo alias (in `.cargo/config.toml`),
+      as tab-completion does not currently support cargo aliases.
 ```
 
-This will create a completely normal cargo project that the IDE of your choice
-will happily work with:
+This will create a completely normal cargo project and Cargo.toml manifest that
+the dev tooling of your choice should happily work with:
 
 ```console-session
-$ cd my-new-lab
+$ cd labdir
 $ tree .
-./
-├── Cargo.toml
-├── src
-│   └── new_lab.rs
-└── templates
-    ├── bare.rs.template
-    ├── basic.rs.template
-    ├── clap.rs.template
-    └── clap_subcmd.rs.template
+  ./
+  ├── Cargo.toml
+  ├── src
+  │   └── my_first_experiment.rs
+  └── templates
+      ├── bare.rs.template
+      ├── basic.rs.template
+      ├── clap.rs.template
+      └── clap_subcmd.rs.template
 ```
 
 Each script managed by `cargo-lab` will have an entry like this in `Cargo.toml`:
 
 ```toml
 [[bin]]
-name = "my-script-name"
-path = "./src/my_script_name.rs"
+name = "my-first-experiment"
+path = "./src/my_first_experiment.rs"
 required-features = ["dep1", "dep2", "dep3/feature"]
 ```
 
 Note that you can (and should) edit the generated Cargo.toml if you want, and
-cargo lab should continue to work normally. If you're having problems, try
-running `cargo check` and `cargo lab check` to detect config issues.
+cargo lab should continue to work normally. (If something gets messed up, try
+running `cargo check` and `cargo lab check` to detect config issues.)
+
+When it comes time to run the this script, `cargo lab run` takes care of
+automatically activating all the features listed in `required-features`
+(`cargo run` requires them all to be listed manually):
+
+```bash
+# this "cargo lab run" command:
+cargo lab run my-first-experiment
+# is the same as running:
+cargo run --bin my-first-script --features 'dep1,dep2,dep3/feature'
+```
 
 ## Useful commands
+
+(Run `cargo lab [subcmd] --help` for full usage documentation.)
 
 ### Installation and setup
 
 - `cargo install --locked cargo-lab` will build and install the latest stable
   version from crates.io and make the `cargo lab` subcommand available.
+- `cargo lab completions --help` will print out the tab-completion setup steps
+  for supported shells (fish, bash, zsh).
+- `cargo lab init (lab path)` to create a new lab.
+- You can set the `CARGO_LAB_MANIFEST_PATH` environment variable to quickly run
+  experiments from any working dir.
 
-### Creating labs projects
+### Creating scripts
 
-- `cargo lab init` - creates a new lab project
-
-### Creating scripts in labs
-
-- `cargo lab quick [deps] [-F features]`: create new script with autogenerated
-  name
-- `cargo lab new (SCRIPT) [deps] [-F features]`: create new script with a chosen
-  name
+- `cargo lab quick [deps] [-F (features)] [--edit]`: create a new script with
+  autogenerated name
+- `cargo lab new (SCRIPTNAME) [deps] [-F (features)] [--edit]`: create a new
+  script with a chosen name
 
 ### Working with scripts
+
+Note that if tab-completion has been enabled in your shell, all script names (in
+addition to subcommands, flags, and other CLI arguments) can be autocompleted in
+these commands.
 
 - `cargo lab run (SCRIPT) [args ...]`: run a script (unlike `cargo run --bin`,
   this automatically activates all required features)
 - `cargo lab edit (SCRIPT)`: open the script in your editor (requires that the
-  `editor-cmd` field to be set in `Cargo.toml`)
+  `editor-cmd` field to be set in the `[package.metadata.cargo-lab]` table
+  `Cargo.toml`)
 - `cargo lab inject (SCRIPT) [deps] [-F features]` - add dependencies and
   activate features for an existing script
 - `cargo lab rename (SCRIPT) (NEW_NAME)` - rename a script
 
-(Note that if autocompletion has been enabled, all subcommands, flags, and
-script names can be tab-completed.)
-
 ### Example
 
-Let's say I want to play around with the `proc-macro2` crate. First I'll create
-a new script and ask for it to be opened in my IDE immediately.
+Let's say I want to experiment with the `proc-macro2` crate. First I'll create a
+new script and ask for it to be opened in my IDE immediately. (Note the
+`cargo lab quick` command automatically generates a name for the script so I
+don't have to think of one myself.)
 
 ```console session
 $ cargo lab quick proc-macro2 --edit
-Generated script name: try-proc-macro2
-running:
-$ cargo add --optional proc-macro2
-    Updating crates.io index
-      Adding proc-macro2 v1.0.106 to optional dependencies
-             Features:
-             + proc-macro
-             - nightly
-             - span-locations
-      Adding feature `proc-macro2`
-    Updating crates.io index
-     Locking 2 packages to latest Rust 1.94.1 compatible versions
-success: Created minimal script at: src/try_proc_macro2.rs
-Updated Cargo.toml:
-19a20,24
-> [[bin]]
-> name = "try-proc-macro2"
-> path = "src/try_proc_macro2.rs"
-> required-features = ["proc-macro2"]
+  Generated script name: try-proc-macro2
+  running:
+  $ cargo add --optional proc-macro2
+      Updating crates.io index
+        Adding proc-macro2 v1.0.106 to optional dependencies
+               Features:
+               + proc-macro
+               - nightly
+               - span-locations
+        Adding feature `proc-macro2`
+      Updating crates.io index
+       Locking 2 packages to latest Rust 1.94.1 compatible versions
+  success: Created minimal script at: src/try_proc_macro2.rs
+  Updated Cargo.toml:
+  19a20,24
+  > [[bin]]
+  > name = "try-proc-macro2"
+  > path = "src/try_proc_macro2.rs"
+  > required-features = ["proc-macro2"]
 ```
 
-And then add the dependencies and features we want to use:
+Then, let's say I also decide to use the `syn` and `quote` crates in this
+experiment - and want to activate `syn`'s `"parsing"` feature. I can inject
+these into the script later.
 
 ```console session
-$ cargo lab inject proc-macro-experiment syn quote proc-macro2 --feature syn/parsing
-running: "$ cargo add --optional syn quote proc-macro2"
-    Updating crates.io index
-      [...]
+$ cargo lab inject try-proc-macro2 syn quote --feature syn/parsing
+  running: "$ cargo add --optional syn quote"
+      Updating crates.io index
+        [...]
 
-Updating features for "proc-macro-experiment" in Cargo.toml:
-    < required-features = []
-    ---
-    > required-features = ["syn", "quote", "proc-macro2", "syn/parsing"]
+  Updating features for "try-proc-macro2" in Cargo.toml:
+      < required-features = ["proc-macro2"]
+      ---
+      > required-features = ["proc-macro2", "syn", "quote", "syn/parsing"]
 ```
 
-Then, you can play with it in the IDE of your choice and run it:
+Now, I can make my changes and run it.
 
 ```console session
-$ rustrover .  # start my IDE
 $ # ... make changes ...
-$ cargo lab run proc-macro-experiment
+$ cargo lab run try-proc-macro2
 my experiment's output goes here
 ```
 
@@ -284,17 +303,9 @@ editor-cmd = ["rustrover"]
 - A normal crate with lots of `[[bin]]` entries also works ok - this project
   used to be my personal lab repository, which then evolved an `xtask` to help
   manage the dependencies, which then turned into this standalone tool.
-
-There are also crates with very similar names to this one:
-
-- [fanzeyi/cargo-play](https://github.com/fanzeyi/cargo-play/), last updated
-  in 2022. support for single-file rust scripts, much like `cargo script` and
-  RFC 3502.
-- [Lutetium-Vanadium/cargo-lab](https://github.com/Lutetium-Vanadium/cargo-lab),
-  last updated in 2021. Seems very similar to this project, and unfortunately
-  has the same name. Not on crates.io - apparently there was _yet another_
-  project (not mine!) with the same name on crates.io at the time, but it
-  apparently got removed sometime between then and mid-2026.
+- [Lutetium-Vanadium/cargo-playground](https://github.com/Lutetium-Vanadium/cargo-lab),
+  Actually seems very similar to this project, but unfortunately I didn't
+  stumble on it it until _after_ I finished this one.
 
 ## Provenance
 

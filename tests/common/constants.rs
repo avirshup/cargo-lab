@@ -25,7 +25,7 @@ pub const CLAP_RENAME: &str = "clap-greeter";
 // these are hardcoded here (i.e., changing them in the code could be
 // be considered a breaking change in the tool)
 // from `ops` module:
-pub const INIT_SCRIPT: &str = "my-first-script";
+pub const INIT_SCRIPT: &str = "my-first-experiment";
 
 // from cli::invocations module:
 pub const DIRECT_COMPLETE_VAR: &str = "COMPLETE_CARGO_LAB_DIRECT";
