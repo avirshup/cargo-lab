@@ -47,6 +47,7 @@ pub fn print_completion_script(
 
     // ───── Part 2: build completer, add customizations, and print─────
     let builtins = Shells::builtins();
+    let version = env!("CARGO_PKG_VERSION");
     let completer = builtins
         .completer(shell_name)
         .ok_or_else(|| crate::Error::UnknownShell(shell_name.to_owned()))?;
@@ -74,6 +75,7 @@ pub fn print_completion_script(
                 minijinja::render!(
                     include_str!("autocomplete_cargo_shim.fish"),
                     cmd,
+                    version,
                     clap_completion_script => &completion_script,
                 )
             ),
@@ -85,6 +87,7 @@ pub fn print_completion_script(
                     include_str!("autocomplete_cargo_shim.bash"),
                     cmd,
                     name,
+                    version,
                     clap_completion_script => &completion_script,
                 )
             ),
@@ -96,6 +99,7 @@ pub fn print_completion_script(
                     include_str!("autocomplete_cargo_shim.zsh"),
                     cmd,
                     name,
+                    version,
                     clap_completion_script => &completion_script,
                 )
             ),
