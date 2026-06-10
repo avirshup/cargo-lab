@@ -25,7 +25,13 @@ pub(super) const STYLES: Styles = Styles::styled()
 
 /// Manage script labs as cargo projects
 #[derive(Clone, Debug, Parser)]
-#[command(version, about, long_about = None, styles = STYLES)]
+#[command(
+    version,
+    about,
+    long_about = None,
+    styles = STYLES,
+    max_term_width = 80,
+)]
 pub struct MainCli {
     #[command(subcommand)]
     pub cmd: SubCmd,
@@ -293,66 +299,67 @@ impl WriteCompletionScript {
         let zsh_lazy_load_instructions = match &invocation {
             InvocationType::Direct { .. } => cformat!(
                 r#"
-  $ <bright-cyan,bold>{this_cmd} zsh >> ~/.zfunc/_{invoked_cmd}</>"#
+    $ <bright-cyan,bold>{this_cmd} zsh >> ~/.zfunc/_{invoked_cmd}</>"#
             ),
             InvocationType::CargoSubcmd { .. } => cformat!(
                 r#"
-  $ <bright-cyan,bold>rustup completions zsh cargo >> ~/.zfunc/_{invoked_cmd}</>
-  $ <bright-cyan,bold>{this_cmd} zsh >>>> ~/.zfunc/_{invoked_cmd}</>"#
+    $ <bright-cyan,bold>rustup completions zsh cargo >> ~/.zfunc/_{invoked_cmd}</>
+    $ <bright-cyan,bold>{this_cmd} zsh >>>> ~/.zfunc/_{invoked_cmd}</>"#
             ),
         };
 
         // NB! ">>" will be transformed into ">" by `color_print`!
         // To make it print "cmd >> file", write "cmd >>>> file"!
         let helpstr = cformat!(
-            r#"This command emits shell scripts that can be used to enable dynamic tab completion in recent versions of shells.
+            r#"This command emits shell scripts for enabling tab-completion in interactive shells. Recent versions of Bash, Zsh, and Fish are all supported and tested; others (including elvish and powershell) <italic>may</> work but have not been tested.
 
-<bright-green,bold>Activating tab completion in supported shells</>
+<bright-green,bold>Activating tab completion in common cases</>
 
-<bold>Fish:</>
-To activate completions <bold>for the current session</>:
-  $ <bright-cyan,bold>{this_cmd} fish | source</>
+  <bold>Fish:</>
+  To activate completions <bold>for the current session</>:
 
-To make these completions available <bold>automatically</>:
- $ <bright-cyan,bold>{this_cmd} fish >> ~/.config/fish/completions/{invoked_cmd}.fish</>
+    $ <bright-cyan,bold>{this_cmd} fish | source</>
 
+  To make these completions available <bold>automatically</>:
 
-<bold>Bash:</>
-To activate completions <bold>for the current session</>:
-  $ <bright-cyan,bold>source <<({this_cmd} bash)</>
-
-To make these completions available <bold>automatically</>, add "<cyan>source <<({this_cmd} bash)</>" to your startup script (e.g., <blue>~/.bashrc</>, <blue>~/.bash_profile</>, or <blue>~/.profile</>).
-
-Tips for Bash:
- - cargo's builtin completions (usually generated via "<cyan>rustup completion bash cargo</>")
-   require the <blue>bash-completion</> package (usually from the system package manager)
-   and activated (usually something like "<cyan>[[ -r '/path/to/bash_completion" ]] && . /path/to/bash_completion</>' in your startup script).
+    $ <bright-cyan,bold>{this_cmd} fish >> ~/.config/fish/completions/{invoked_cmd}.fish</>
 
 
-<bold>Zsh:</>
-To activate completions <bold>for the current session</>:
-  $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
+  <bold>Bash:</>
+  To activate completions <bold>for the current session</>:
 
-To make these completions available <bold>automatically</> (assuming <blue>~/.zfunc</> is in your <blue>$fpath</>):{zsh_lazy_load_instructions}
+    $ <bright-cyan,bold>source <<({this_cmd} bash)</>
 
-Tips for ZSH:
- - The "compinit" module will need to have been activated. (usually via "<cyan>autoload -U compinit; compinit</>" in your startup script.)
+  To make these completions available <bold>automatically</>, add
+    <cyan>source <<({this_cmd} bash)</>
+  to the appropriate startup script (<blue>~/.bashrc</>, <blue>~/.bash_profile</>, etc.).
 
- - If <blue>~/.zfunc</> is not in your <blue>$fpath</>, either replace it with the appropriate directory, or add "<cyan>fpath+=~/.zfunc</>" to your shell's startup script <italic>prior</> to loading compinit.
+  Cargo's completions (usually generated via "<cyan>rustup completion bash cargo</>") require the <blue>bash-completion</> package to be installed (usually via package manager) <italic>and</> activated somewhere in your user or system startup scripts.
+
+
+  <bold>Zsh:</>
+  The "compinit" module will need to have been activated (usually via "<cyan>autoload -U compinit; compinit</>" in your startup script). To activate completions <bold>for the current session</>:
+
+    $ <bright-cyan,bold>source <<({this_cmd} zsh)</>
+
+  To have the completions <bold>lazily-loaded on demand</>:
+{zsh_lazy_load_instructions}
+
+   (This assumes that the directory <blue>~/.zfunc/</> is in your zsh function path <blue>$fpath</>. If not, either replace it in the command above with an appropriate directory, or run <cyan>mkdir ~/.zfunc</> and then add "<cyan>fpath+=~/.zfunc</>" to your startup script.)
 
 
 <bright-green,bold>Caveats for all shells</>
-Please note that:
-
- - the scripts generated here <italic>and</> and setup instructions above will be different depending on whether you're calling this through cargo ("<cyan>cargo lab</>") or directly ("<cyan>cargo-lab</>");
-
- - the scripts may require further tweaking in highly customized shell setups; and
-
- - completions have only been tested with <italic>recent releases</> of the supported shells.
+  <bold>*</> The scripts generated here <italic>and</> setup instructions above will be
+    different depending on whether you're calling this through cargo
+    ("<cyan>cargo lab</>") or directly ("<cyan>cargo-lab</>").
+  <bold>*</> The scripts may require further tweaking in highly customized shell setups.
+  <bold>*</> Completions have only been tested with <italic>recent releases</> of the
+    supported shells.
 "#
         );
 
-        cmd.after_help(helpstr)
+        cmd.after_long_help(helpstr)
+            .after_help("Pass '--help' for setup instructions")
     }
 }
 
