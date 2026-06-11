@@ -142,9 +142,9 @@ Note that you can (and should) edit the generated Cargo.toml if you want, and
 cargo lab should continue to work normally. (If something gets messed up, try
 running `cargo check` and `cargo lab check` to detect config issues.)
 
-When it comes time to run the this script, `cargo lab run` takes care of
-automatically activating all the features listed in `required-features`
-(`cargo run` requires them all to be listed manually):
+When executing these scripts, `cargo lab run` takes care of automatically
+activating all the features listed in `required-features` (`cargo run` requires
+them all to be listed manually):
 
 ```bash
 # this "cargo lab run" command:
@@ -155,7 +155,7 @@ cargo run --bin my-first-script --features 'dep1,dep2,dep3/feature'
 
 ## Useful commands
 
-(Run `cargo lab [subcmd] --help` for full usage documentation.)
+(Use `cargo lab --help` and `cargo lab [subcmd] --help` to see complete docs.)
 
 ### Installation and setup
 
@@ -163,9 +163,10 @@ cargo run --bin my-first-script --features 'dep1,dep2,dep3/feature'
   version from crates.io and make the `cargo lab` subcommand available.
 - `cargo lab completions --help` will print out the tab-completion setup steps
   for supported shells (fish, bash, zsh).
-- `cargo lab init (lab path)` to create a new lab.
-- You can set the `CARGO_LAB_MANIFEST_PATH` environment variable to quickly run
-  experiments from any working dir.
+- `cargo lab init (lab path)` will create a new lab project.
+
+After creating a project, you can set the `CARGO_LAB_MANIFEST_PATH` environment
+variable to quickly run your experiments from any working dir.
 
 ### Creating scripts
 
